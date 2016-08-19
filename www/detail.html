@@ -1,0 +1,70 @@
+
+         			<div class="modal-header" ng-switch on="order.status">
+            			<button type="button" class="close" ng-click="cancel()" aria-hidden="true"> &times; </button>
+            			<h4 class="modal-title">Order# {{ order.order_id }} 
+	            			<span class="label label-warning" ng-switch-when="O">{{ formatOrderStatus(order.status) }}</span>
+	            			<span class="label label-success" ng-switch-when="S">{{ formatOrderStatus(order.status) }}</span>
+	            			<span class="label label-default" ng-switch-when="C">{{ formatOrderStatus(order.status) }}</span>
+            			</h4>
+            			<h2 class="modal-title" >{{ order.item_id }}</h2>
+            			<h4 class="modal-title" >{{ order.item_desc }}</h4>
+         			</div>
+         			<div class="modal-body">
+         				<div class="row">
+         					<div class="col-md-4">
+         						<img ng-src="{{ order.item.image_url }}" class="img-thumbnail">
+         					</div>
+         					<div class="col-md-4">
+         						<pre id="addr" style="border:0px;background-color:transparent;padding:0px;margin:0px;width:min-content">{{ order.shipping_full_addr }}</pre>
+         					</div>
+         					<div class="col-md-2">
+         						<button class="btn" data-clipboard-action="copy" data-clipboard-target="#addr">Copy</button>
+         					</div>
+         				</div>
+         				<div class="row" style="margin-top:10px">
+         					<div class="col-md-4">
+								<div class="input-group">
+									<span class="input-group-addon danger">Qty</span>
+		         					<input type="text" class="form-control" placeholder="" ng-model="order.qty" readonly>
+								</div>
+							</div>
+							<div class="col-md-4">
+								<div class="input-group">
+									<span class="input-group-addon">Item Cost</span>
+		         					<input type="text" class="form-control" placeholder="" decimal ng-model="order.item_cost" readonly>
+								</div>
+							</div>
+							<div class="col-md-4">
+								<div class="input-group">
+									<span class="input-group-addon">Additional Cost</span>
+		         					<input type="text" class="form-control" placeholder="" decimal ng-model="order.other_cost">
+								</div>
+							</div>
+						</div>
+         				<div class="row" style="margin-top:10px" ng-repeat="t in order.tracking_numbers">
+         					<div class="col-md-8">
+		         				<div class="input-group" >
+								  	<span class="input-group-addon" id="basic-addon1">Tracking#</span>
+		         					<input type="text" class="form-control" id="tn{{$index}}" placeholder="" ng-model="order.tracking_numbers[$index].tracking_number">
+								</div>
+							</div>
+							<div class="col-md-4">
+								<div class="input-group">
+									<span class="input-group-addon" id="basic-addon1">Shipping Cost</span>
+			         				<input type="text" style="width:60px" class="form-control" id="sf{{$index}}" placeholder="" decimal ng-model="order.tracking_numbers[$index].cost">
+								</div>
+							</div>
+						</div>
+		
+						<br>
+						<div class="form-group">
+						<label for="comment">Comment:</label>
+						<textarea style="resize:none" class="form-control" rows="5" id="comment" ng-model="order.memo"></textarea>
+						</div>
+         			</div>
+					<div class="modal-footer">
+						<span class="label label-danger">{{ error }}</span>
+						<button type="button" class="btn btn-default" ng-click="cancel()">Cancel</button>
+						<button type="button" class="btn btn-primary" ng-click="update()">Save</button>
+					</div>
+ 

@@ -1,0 +1,26 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<AmazonEnvelope xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xsi:noNamespaceSchemaLocation="amzn-envelope.xsd">
+    <Header>     
+		<DocumentVersion>1.01</DocumentVersion>      
+		<MerchantIdentifier>A2BD7G5CIBE1BV</MerchantIdentifier>
+    </Header>  
+	<MessageType>OrderFulfillment</MessageType>
+	{% for tn in tracking_number_list %}
+    <Message>     
+		<MessageID>{{ loop.index }}</MessageID>     
+		<OrderFulfillment>         
+			<AmazonOrderID>{{ tn.order.source_id }}</AmazonOrderID>
+			<FulfillmentDate>{{ tn.in_date.isoformat() }}</FulfillmentDate>         
+			<FulfillmentData>            
+				<CarrierCode>{{ tn.carrier }}</CarrierCode>            
+				<ShippingMethod>{{ tn.shipping_method }}</ShippingMethod>             
+				<ShipperTrackingNumber>{{ tn.tracking_number }}</ShipperTrackingNumber>        
+			</FulfillmentData>          
+			<Item>            
+				<AmazonOrderItemCode>{{ tn.order.order_item_id }}</AmazonOrderItemCode>
+				<Quantity>{{ tn.shipped_qty }}</Quantity>         
+			</Item>     
+		</OrderFulfillment>
+    </Message>
+    {% endfor %}
+</AmazonEnvelope>

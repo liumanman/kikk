@@ -1,0 +1,181 @@
+<!DOCTYPE html>
+<html>
+	<head>
+		<meta charset="UTF-8">
+		<!-- <script src="https://ajax.googleapis.com/ajax/libs/jquery/2.2.2/jquery.min.js"></script> -->
+		<script src="https://code.jquery.com/jquery-1.12.4.min.js" integrity="sha256-ZosEbRLbNQzLpnKIkEdrPv7lOy9C27hHQ+Xp8a4MxAQ=" crossorigin="anonymous"></script>
+
+		<link href="https://maxcdn.bootstrapcdn.com/bootstrap/3.3.6/css/bootstrap.min.css" rel="stylesheet" integrity="sha384-1q8mTJOASx8j1Au+a5WDVnPi2lkFfwwEAa8hDDdjZlpLegxhjVME1fgjWPGmkzs7" crossorigin="anonymous">
+
+		<script src="https://maxcdn.bootstrapcdn.com/bootstrap/3.3.6/js/bootstrap.min.js" integrity="sha384-0mSbJDEHialfmuBBQP6A4Qrprq5OVfW37PRR3j5ELqxss1yVqOtnepnHVP9aJ7xS" crossorigin="anonymous"></script>
+
+		<script src="js/moment-with-locales.js"></script>
+
+		<script type="text/javascript" src="js3/daterangepicker.js"></script>
+		<link rel="stylesheet" type="text/css" href="css3/daterangepicker.css" />
+	</head>
+	<body>
+		
+<div class="well">
+
+
+
+<form class="form-inline" role="form">
+<div class="form-group">  
+ <select class="form-control">  
+ <option>1</option>  
+ <option>2</option>  
+ <option>3</option>  
+ <option>4</option>  
+ <option>5</option>  
+ </select>  
+ </div>
+
+
+<div class="input-prepend input-group"  >
+
+	<span class="add-on input-group-addon" >
+		<i class="glyphicon glyphicon-calendar fa fa-calendar"> </i>
+	</span>
+	<input  type="text" style="width: 200px;" name="reservation" id="reservation" class="form-control">
+	<span class="input-group-addon"><span id="clear" class="glyphicon glyphicon-remove"></span></span>
+</div>
+
+
+<script type="text/javascript">
+
+						$(document).ready(function() {
+
+							$('#reservation').daterangepicker({
+ranges: {
+    		'Today': [moment(), moment()],
+           'Yesterday': [moment().subtract(1, 'days'), moment().subtract(1, 'days')],
+           'Last 7 Days': [moment().subtract(6, 'days'), moment()],
+           'Last 30 Days': [moment().subtract(29, 'days'), moment()],
+           'This Month': [moment().startOf('month'), moment().endOf('month')],
+           'Last Month': [moment().subtract(1, 'month').startOf('month'), moment().subtract(1, 'month').endOf('month')]
+    	},
+    	autoUpdateInput: false
+							},
+							function(start, end, label) {
+
+								console.log(start.toISOString(), end.toISOString(), label);
+
+							});
+
+						});
+
+						$("#reservation").on("apply.daterangepicker", function(ev, picker){
+							$(this).val(picker.startDate.format('MM/DD/YYYY') + ' - ' + picker.endDate.format('MM/DD/YYYY'));
+						})
+
+						$("#clear").click(function(){
+							// var drp = $('#reservation').data('daterangepicker');
+							// drp.setStartDate('2014-03-01');
+							// drp.setEndDate('2014-03-01');
+							$('#reservation').val("");
+						});
+					</script>
+
+</form>
+</div>
+
+
+<input class="form-control" type="text" name="daterange" value="01/01/2015 - 01/31/2015" />
+
+<script type="text/javascript">
+$(function() {
+    $('input[name="daterange"]').daterangepicker({
+    	ranges: {
+    		'Today': [moment(), moment()],
+           'Yesterday': [moment().subtract(1, 'days'), moment().subtract(1, 'days')],
+           'Last 7 Days': [moment().subtract(6, 'days'), moment()],
+           'Last 30 Days': [moment().subtract(29, 'days'), moment()],
+           'This Month': [moment().startOf('month'), moment().endOf('month')],
+           'Last Month': [moment().subtract(1, 'month').startOf('month'), moment().subtract(1, 'month').endOf('month')]
+    	}
+    });
+});
+</script>
+
+
+
+
+
+
+
+
+
+
+
+	<div class="well">
+
+					<div class="dropdown" style="display: inline-block;">
+
+						<a data-toggle="dropdown" class="btn btn-primary" href="http://www.jq22.com/demo/bootstrap-daterangepicker-master/#">
+
+							Regular dropdown
+
+						</a>
+
+						<ul class="dropdown-menu" role="menu" aria-labelledby="dLabel">
+
+							<li>
+
+								<a href="http://www.jq22.com/demo/bootstrap-daterangepicker-master/#">
+
+									item
+
+								</a>
+
+							</li>
+
+						</ul>
+
+					</div>
+
+					<div id="reportrange2" class="btn" style="display: inline-block; background: #fff; cursor: pointer; padding: 5px 10px; border: 1px solid #ccc">
+
+						<i class="glyphicon glyphicon-calendar fa fa-calendar">
+
+						</i>
+	
+
+						<span id="selector">May 25, 2016 - June 23, 2016</span>
+
+						<b class="caret">
+
+						</b>
+
+					</div>
+
+					<script type="text/javascript">
+
+						$(document).ready(function() {
+
+							$('#selector').html(moment().subtract('days', 29).format('MMMM D, YYYY') + ' - ' + moment().format('MMMM D, YYYY'));
+
+							$('#reportrange2').daterangepicker(
+{
+    	ranges: {
+    		'Today': [moment(), moment()],
+           'Yesterday': [moment().subtract(1, 'days'), moment().subtract(1, 'days')],
+           'Last 7 Days': [moment().subtract(6, 'days'), moment()],
+           'Last 30 Days': [moment().subtract(29, 'days'), moment()],
+           'This Month': [moment().startOf('month'), moment().endOf('month')],
+           'Last Month': [moment().subtract(1, 'month').startOf('month'), moment().subtract(1, 'month').endOf('month')]
+    	}
+    }
+								);
+
+						});
+
+					</script>
+
+				</div>
+
+
+
+
+	</body>
+</html>

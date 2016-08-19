@@ -1,0 +1,9 @@
+[Mon Jul 25 15:32:38.014669 2016] [authz_core:error] [pid 98434] [client ::1:55370] AH01630: client denied by server configuration: /Users/liumanman/workspace/kikk/www/test2.html
+[Mon Jul 25 15:32:52.754497 2016] [authz_core:error] [pid 98438] [client ::1:55373] AH01630: client denied by server configuration: /Users/liumanman/workspace/kikk/www/test2.html
+[Mon Jul 25 15:37:06.171074 2016] [authz_core:error] [pid 98447] [client ::1:55405] AH01630: client denied by server configuration: /Users/liumanman/workspace/kikk/www/test2.html
+[Mon Jul 25 15:37:11.278056 2016] [authz_core:error] [pid 98449] [client ::1:55406] AH01630: client denied by server configuration: /Users/liumanman/workspace/kikk/www/test2.html
+[Mon Jul 25 15:37:17.127251 2016] [authz_core:error] [pid 98447] [client ::1:55410] AH01630: client denied by server configuration: /Users/liumanman/workspace/kikk/www/
+[Mon Jul 25 15:37:19.615806 2016] [authz_core:error] [pid 98447] [client ::1:55410] AH01630: client denied by server configuration: /Users/liumanman/workspace/kikk/www/
+[Mon Jul 25 15:38:37.645083 2016] [authz_core:error] [pid 98459] [client ::1:55422] AH01630: client denied by server configuration: /Users/liumanman/workspace/kikk/www/
+[Mon Jul 25 15:38:44.100714 2016] [authz_core:error] [pid 98449] [client ::1:55424] AH01630: client denied by server configuration: /Users/liumanman/workspace/kikk/www/test2.html
+[Mon Jul 25 15:39:02.120062 2016] [authz_core:error] [pid 98457] [client ::1:55425] AH01630: client denied by server configuration: /Users/liumanman/workspace/kikk/www/test7.html

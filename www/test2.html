@@ -1,0 +1,204 @@
+<!DOCTYPE html>
+<html ng-app="kikk">
+    <head>
+        <meta charset="UTF-8">
+        <!-- <script src="https://ajax.googleapis.com/ajax/libs/jquery/2.2.2/jquery.min.js"></script> -->
+        <script src="https://code.jquery.com/jquery-1.12.4.min.js" integrity="sha256-ZosEbRLbNQzLpnKIkEdrPv7lOy9C27hHQ+Xp8a4MxAQ=" crossorigin="anonymous"></script>
+
+        <link href="https://maxcdn.bootstrapcdn.com/bootstrap/3.3.6/css/bootstrap.min.css" rel="stylesheet" integrity="sha384-1q8mTJOASx8j1Au+a5WDVnPi2lkFfwwEAa8hDDdjZlpLegxhjVME1fgjWPGmkzs7" crossorigin="anonymous">
+
+        <script src="https://maxcdn.bootstrapcdn.com/bootstrap/3.3.6/js/bootstrap.min.js" integrity="sha384-0mSbJDEHialfmuBBQP6A4Qrprq5OVfW37PRR3j5ELqxss1yVqOtnepnHVP9aJ7xS" crossorigin="anonymous"></script>
+
+        <script src="https://ajax.googleapis.com/ajax/libs/angularjs/1.5.7/angular.js"></script> 
+<script src="js/moment-with-locales.js"></script>
+        <script type="text/javascript" src="https://cdnjs.cloudflare.com/ajax/libs/angular-ui-bootstrap/2.0.0/ui-bootstrap-tpls.js"></script>
+        <script type="text/javascript" src="js/main.js"></script>
+        <script type="text/javascript" src="js3/daterangepicker.js"></script>
+        <link rel="stylesheet" type="text/css" href="css3/daterangepicker.css" />
+        <script type="text/javascript" src="js3/clipboard.min.js"></script>
+        <link rel="stylesheet" href="/css/kikk.css" type="text/css" />
+    </head>
+    <body ng-cloak>
+                        
+    <div class="well" style="height:80px" ng-controller="filterController">
+
+
+
+<form class="form-inline" role="form">
+
+<div class="col-md-4">
+<div class="form-group">  
+ <select class="form-control" ng-model="filter.conditionType">  
+ <option value="order_id">ID</option>  
+ <option value="item_id">Item#</option>  
+ <option value="tracking_number">Tracking#</option>  
+ <option value="address">Address</option>
+ </select>  
+ </div>
+
+ <input type="text" class="form-control" id="condition" placeholder="" ng-model="filter.condition">
+ </div>
+
+
+<div class="col-md-5">
+<div class="form-group">  
+ <select class="form-control" ng-model="filter.dateType">  
+ <option value="order_date">Order Date</option>  
+ <option value="shipping_date">Shipping Date</option>  
+ </select>  
+ </div>
+
+
+<div class="input-prepend input-group"  >
+
+    <span class="add-on input-group-addon" >
+        <i class="glyphicon glyphicon-calendar fa fa-calendar"> </i>
+    </span>
+    <input  type="text" style="width: 200px;" name="reservation" id="reservation" class="form-control">
+    <span class="input-group-addon"><span id="clear" class="glyphicon glyphicon-remove"></span></span>
+</div>
+</div>
+
+
+<div class="col-md-2">
+<lable for="reservation">Status:</lable>
+<div class="form-group">  
+ <select class="form-control" ng-model="filter.status">  
+<!--  <option value="O">Open</option>  
+ <option value="S">Shipped</option>  
+ <option value="C">Closed</option>
+ --> <option ng-repeat="status in orderStatusDef" value="{{ status.code }}">{{ status.desc }}</option>
+ </select>  
+ </div>
+ </div>
+
+<button type="button" class="btn btn-primary col-md-1" ng-click="search()">Search</button>
+
+<script type="text/javascript">
+
+                        $(document).ready(function() {
+                            var appElement = document.querySelector('[ng-controller=filterController]');
+                                var $scope = angular.element(appElement).scope();
+                                // $scope.search();
+
+                            $('#reservation').daterangepicker({
+ranges: {
+            'Today': [moment(), moment()],
+           'Yesterday': [moment().subtract(1, 'days'), moment().subtract(1, 'days')],
+           'Last 7 Days': [moment().subtract(6, 'days'), moment()],
+           'Last 30 Days': [moment().subtract(29, 'days'), moment()],
+           'This Month': [moment().startOf('month'), moment().endOf('month')],
+           'Last Month': [moment().subtract(1, 'month').startOf('month'), moment().subtract(1, 'month').endOf('month')]
+        },
+        autoUpdateInput: false
+                            },
+                            function(start, end, label) {
+                                // $scope.filter.dateFrom = start.toISOString();
+                                // $scope.filter.dateTo = end.toISOString();
+                                // $scope.$apply();    
+                                // console.log(start.toISOString(), end.toISOString(), label);
+
+                            });
+
+                        $("#reservation").on("apply.daterangepicker", function(ev, picker){
+                            $(this).val(picker.startDate.format('MM/DD/YYYY') + ' - ' + picker.endDate.format('MM/DD/YYYY'));
+
+                                $scope.filter.dateFrom = picker.startDate.format('MM/DD/YYYY');
+                                $scope.filter.dateTo = picker.endDate.format('MM/DD/YYYY');
+                                $scope.$apply();    
+
+                            // console.log(picker.startDate.toISOString(), picker.endDate.toISOString());
+                        })
+
+                        $("#clear").click(function(){
+                            // var drp = $('#reservation').data('daterangepicker');
+                            // drp.setStartDate('2014-03-01');
+                            // drp.setEndDate('2014-03-01');
+                            $('#reservation').val("");
+                            $scope.filter.dateFrom = '';
+                            $scope.filter.dateTo = '';
+                            $scope.$apply();
+                        });
+
+
+
+                        });
+
+                        
+                    </script>
+
+</form>
+</div>  
+
+
+        <table class="table table-bordered table-hover" ng-controller="tableController" style="width:95%" align="center">
+            <thead>
+                <tr>
+                    <td style="width:60px">ID</td>
+                    <td style="width:100px">Item#</td>
+                    <td>Description</td>
+                    <td style="width:100px">Image</td>
+                    <td style="width:40px">Qty</td>
+                    <td>Address</td>
+                    <td style="width:60px">Status</td>
+                    <td style="width:180px">Tracking#</td>
+                    <td style="width:100px">Action</td>
+                </tr>
+            </thead>
+            <tbody>
+                <tr ng-repeat="order in data">
+                    <td>{{ order.order_id}}</td>
+                    <td>{{ order.item_id }}</td>
+                    <td style="word-break:break-all; word-wrap:break-all;">{{ order.item_desc }}</td>
+                    <td><img ng-src="{{ order.item.image_url }}" class="img-thumbnail"></td>
+                    <td>{{ order.qty }}</td>
+                    <td style="word-break:break-all; word-wrap:break-all;padding:5px">
+                        <pre id="d{{ order.id }}" style="border:0px;background-color:transparent;padding:0px;margin:0px">{{ order.shipping_full_addr }}</pre>
+                    </td>
+                    <td>{{ formatOrderStatus(order.status) }}
+                    <span value='xxx'></span>
+                    </td>
+                    <td>
+                        <h5 ng-repeat="tn in order.tracking_numbers">{{ tn.tracking_number }}</h5>
+                    </td>
+                    <td>
+                        <div class="dropdown" >
+                            <div class="btn-group">
+                                <button type="button" class="btn btn-default" ng-click="detail(order)" >Detail</button>
+                                <!--
+                                <button type="button" class="btn dropdown-toggle" data-toggle="dropdown">...</button>
+                                <ul class="dropdown-menu" role="menu">
+                                    <li role="presentation">
+                                        <a role="menuitem" href="#" data-toggle="modal" data-target="#myModal">Ship</a>
+                                    </li>
+                                    <li role="presentation">
+                                        <a role="menuitem" href="#">Update Tracking#</a>
+                                    </li>
+                                    <li role="presentation">
+                                        <a role="menuitem" href="#">Note</a>
+                                    </li>
+
+                                </ul>
+                                -->
+                            </div>
+                        </div>
+                    </td>
+                </tr>
+
+            </tbody>
+        </table>
+        
+      
+        <!-- /.modal -->    
+        
+         <script>
+    var clipboard = new Clipboard('.btn');
+    clipboard.on('success', function(e) {
+        console.log(e);
+    });
+    clipboard.on('error', function(e) {
+        console.log(e);
+    });
+    </script>
+    </body>
+</html>
