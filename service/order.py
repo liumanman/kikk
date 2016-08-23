@@ -108,18 +108,18 @@ def update_shipment(order_id, shipment_id):
         raise Exception("Can't find order {}".format(order_id))
     order.update_shipment(shipment_id)
 
-def update_tracking_number(order_id, *tn_data):
-    if not tracking_numbers:
+def update_tracking_number(order_id, *tracking_data_list):
+    if not tracking_data_list:
         raise Exception('tracking number is null.')
     order = Order.get_by_id(order_id)
     if not order:
         raise Exception("can't find order {}".format(order_id))
     with db.session.begin():
-        for tn in tn_data:
-            tracking_number = TrackingNumber(order_id, tn.tracking_number, 0)
-            tracking_number.shipped_qty = tn.qty
-            tracking_number.carrier = tn.carrier 
-            tracking_number.shipping_method = tn.shipping_method 
+        for td in tracking_data_list:
+            tracking_number = TrackingNumber(order_id, td.tracking_number, 0)
+            tracking_number.shipped_qty = td.qty
+            tracking_number.carrier = td.carrier 
+            tracking_number.shipping_method = td.shipping_method 
             # tracking_number.shipping_method = 'First Class' 
             tracking_number.create()
         order.ship()

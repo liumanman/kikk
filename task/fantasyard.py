@@ -84,7 +84,8 @@ def _create_shipment(order):
     screenshot_path = os.path.join(sys.path[0], 'screenshot/', '{}.png'.format(order.order_id))
     # print(screenshot_path)
     driver.get_screenshot_as_file(screenshot_path)
-    choice = input('Confirm to place order?')
+    # choice = input('Confirm to place order?')
+    choice = 'y'
     if choice == 'y':
         driver.find_element_by_id('place_order').click()
         for i in range(10):
@@ -122,10 +123,10 @@ def update_tracking_number(order_id, driver):
     order =  get_by_id(order_id)
     if not order:
         raise Exception("Can't find order {}".format(order_id))
-    tracking_number = _dowload_tracking_number(order.shipment_id, driver)
-    if tracking_number:
-        update_tn(order_id, tracking_number)
-    return tracking_number
+    tracking_data_list = _dowload_tracking_number(order.shipment_id, driver)
+    if tracking_data_list:
+        update_tn(order_id, *tracking_data_list)
+    return [td.tracking_number for td in tracking_data_list] 
 
 def update_tn_by_batch():
     order_list = get_ship_ready_order()
@@ -135,10 +136,10 @@ def update_tn_by_batch():
     driver = _init_driver()
     _login(driver)
     for order in order_list:
-        tn = update_tracking_number(order.order_id, driver)
-        print(order, tn)
+        tn_list = update_tracking_number(order.order_id, driver)
+        print(order, tn_list)
 
-def _dowload_tracking_number(shipment_id, driver):
+def _dowload_tracking_number_old(shipment_id, driver):
     html = _download_shipment_page(shipment_id, driver)
     # print(html)
     bs = BeautifulSoup(html, 'html.parser')
@@ -150,7 +151,7 @@ def _dowload_tracking_number(shipment_id, driver):
     return None
 
 
-def _dowload_tracking_number2(shipment_id, driver):
+def _dowload_tracking_number(shipment_id, driver):
     html = _download_shipment_page(shipment_id, driver)
     # print(html)
     bs = BeautifulSoup(html, 'html.parser')

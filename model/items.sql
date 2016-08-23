@@ -103,8 +103,22 @@ select
 	,750
 	,'https://www.fantasyard.com/images/thumbnails/17/100/100/TDN70EK-1.jpg'
 	,'http://www.fantasyard.com/jansport-big-student-school-backpack-black-white-bebop.html'
-
-
+union all
+select
+	'T50109Y'
+	,'JanSport SuperBreak School Backpack - MULTI DONUTS'
+	,1900
+	,350
+	,'https://www.fantasyard.com/images/thumbnails/15/100/100/T501_09Y_front.jpg'
+	,'http://www.fantasyard.com/jansport-superbreak-school-backpack-multi-donuts.html'
+union all
+select
+	'T5010DS'
+	,'JanSport SuperBreak School Backpack - NAVY MOONSHINE ISLAND OMBRE'
+	,1900
+	,350
+	,'https://www.fantasyard.com/images/thumbnails/16/100/100/T501_0DS_front.jpg'
+	,'http://www.fantasyard.com/jansport-superbreak-school-backpack-navy-moonshine-island-ombre.html'
 
 
 

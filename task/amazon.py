@@ -1,5 +1,5 @@
 from boto.mws import connection
-import dateutil.parser
+from dateutil import parser as tp
 import datetime
 import time
 from jinja2 import Template
@@ -32,11 +32,12 @@ def insert_unshipped_order():
         if not get_by_source_id(source, order.AmazonOrderId):
             shipping_state = _short_state(order.ShippingAddress.StateOrRegion)
             item_list = conn.list_order_items(AmazonOrderId=order.AmazonOrderId).ListOrderItemsResult.OrderItems.OrderItem
+            order_date = tp.parse(order.PurchaseDate).astimezone() 
             for item in item_list:
                 try:
                     item_id = item.SellerSKU.split('-')[0]
-                    insert_order(source=source, source_id=order.AmazonOrderId, order_date=dateutil.parser.parse(order.PurchaseDate), item_id=item_id,
-                                 price=int(float(item.ItemPrice.Amount)*100)/item.QuantityOrdered, qty=item.QuantityOrdered, customer_name=order.ShippingAddress.Name,
+                    insert_order(source=source, source_id=order.AmazonOrderId, order_date=order_date, item_id=item_id,
+                                 price=int(float(item.ItemPrice.Amount)*100)/int(item.QuantityOrdered), qty=item.QuantityOrdered, customer_name=order.ShippingAddress.Name,
                                  shipping_address=order.ShippingAddress.AddressLine1,
                                  shipping_address2='{0} {1}'.format(getattr(order.ShippingAddress, 'AddressLine2', ''),getattr(order.ShippingAddress, 'AddressLine3', '')), 
                                  shipping_city=order.ShippingAddress.City,
@@ -67,6 +68,7 @@ def _addr_to_str(address):
 def _short_state(state):
     if state.title() in _states:
         return _states[state.title()]
+    state = state.replace('.', '')
     if state.upper() in _states.values():
         return state.upper()
     raise Exception('Invalid state {}'.format(state))

@@ -95,3 +95,4 @@ venv_kikk/
 kikk.db
 kikk.sublime-project
 kikk.sublime-workspace
+task/screenshot/*
