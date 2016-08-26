@@ -119,6 +119,14 @@ select
 	,350
 	,'https://www.fantasyard.com/images/thumbnails/16/100/100/T501_0DS_front.jpg'
 	,'http://www.fantasyard.com/jansport-superbreak-school-backpack-navy-moonshine-island-ombre.html'
+union all
+select
+	'T5010C6'
+	,'JanSport SuperBreak School Backpack - AQUA DASH ZOU BISOU'
+	,1900
+	,350
+	,'https://www.fantasyard.com/images/thumbnails/15/100/100/T501_0C6_front.jpg'
+	,'http://www.fantasyard.com/jansport-superbreak-school-backpack-aqua-dash-zou-bisou.html'
 
 
 
