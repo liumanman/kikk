@@ -10,10 +10,10 @@ marketplace_id = 'ATVPDKIKX0DER'
 source = 'Amazon'
 order_fulfillment_template = 'order_fulfillment_template.xml'
 
-def init(get_by_source_id_fun, insert_order_fun):
-    global get_by_source_id, insert_order
-    get_by_source_id = get_by_source_id_fun
-    insert_order = insert_order_fun
+# def init(get_by_source_id_fun, insert_order_fun):
+#     global get_by_source_id, insert_order
+#     get_by_source_id = get_by_source_id_fun
+#     insert_order = insert_order_fun
 
 def insert_unshipped_order():
     conn = connection.MWSConnection(Merchant=merchant_id)
@@ -194,17 +194,31 @@ _states['Wisconsin'] = 'WI'
 _states['Wyoming'] = 'WY'
 
 
+def init(flask_app, module_path, db_uri):
+    import sys
+    sys.path.append(module_path)
+
+    from model.database import init_db
+    init_db(flask_app, uri=db_uri)
+    from service.order import get_by_source_id, insert_order, get_open_tracking_number, get_shipped_order, close_order as close_order_by_id
+
 
 if __name__ == '__main__':
-    import sys
-    sys.path.append('../')
     from flask import Flask
-    from model.database import init_db
-
     app = Flask(__name__)
-    init_db(app, uri='sqlite:///../kikk.db')
-    from service.order import get_by_source_id, insert_order, get_open_tracking_number, get_shipped_order, close_order as close_order_by_id
-    init(get_by_source_id, insert_order)
+    init(app, '../', 'sqlite:///../kikk.db')
     insert_unshipped_order()
     upload_tracking_number()
-    # close_order()
+
+    # import sys
+    # sys.path.append('../')
+    # from flask import Flask
+    # from model.database import init_db
+
+    # app = Flask(__name__)
+    # init_db(app, uri='sqlite:///../kikk.db')
+    # from service.order import get_by_source_id, insert_order, get_open_tracking_number, get_shipped_order, close_order as close_order_by_id
+    # # init(get_by_source_id, insert_order)
+    # insert_unshipped_order()
+    # upload_tracking_number()
+    # # close_order()

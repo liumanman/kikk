@@ -186,17 +186,29 @@ def _download_shipment_page(shipment_id, driver):
     driver.get(_shipment_page_url.format(shipment_id))
     return driver.page_source
 
-
-if __name__ == '__main__':
+def init(flask_app, moduel_path, db_uri):
     import sys
-    sys.path.append('../')
-    from flask import Flask
+    sys.path.append(moduel_path)
     from model.database import init_db
 
-    app = Flask(__name__)
-    init_db(app, uri='sqlite:///../kikk.db')
-
+    init_db(flask_app, db_uri)
     from service.order import get_by_source_id, update_shipment, get_open_orders, get_by_id, update_tracking_number as update_tn, get_ship_ready_order
+
+
+if __name__ == '__main__':
+    # import sys
+    # sys.path.append('../')
+    # from flask import Flask
+    # from model.database import init_db
+
+    # app = Flask(__name__)
+    # init_db(app, uri='sqlite:///../kikk.db')
+
+    # from service.order import get_by_source_id, update_shipment, get_open_orders, get_by_id, update_tracking_number as update_tn, get_ship_ready_order
+
+    from flask import Flask
+    _app = flask(__name__)
+    init(_app, '../', 'sqlite:///../kikk.db')
 
     print('######### Create Shipment ##########')
     create_shipment_by_batch()
