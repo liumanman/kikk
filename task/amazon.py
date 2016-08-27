@@ -1,6 +1,5 @@
 from boto.mws import connection
 from dateutil import parser as tp
-import datetime
 import time
 from jinja2 import Template
 
@@ -15,20 +14,18 @@ order_fulfillment_template = 'order_fulfillment_template.xml'
 #     get_by_source_id = get_by_source_id_fun
 #     insert_order = insert_order_fun
 
+
 def insert_unshipped_order():
     conn = connection.MWSConnection(Merchant=merchant_id)
 
     kw = {
         'CreatedAfter': '2016-07-01T18:12:21',
         'MarketplaceId': [marketplace_id],
-        'OrderStatus': ['Unshipped','PartiallyShipped']
-        
+        'OrderStatus': ['Unshipped', 'PartiallyShipped']
     }
     order_list = conn.list_orders(**kw).ListOrdersResult.Orders.Order
     # item_list = conn.list_order_items(AmazonOrderId=order_list[0].AmazonOrderId)
     for order in order_list:
-        # if order.AmazonOrderId == '108-2111202-6118662':
-        #     print()
         if not get_by_source_id(source, order.AmazonOrderId):
             shipping_state = _short_state(order.ShippingAddress.StateOrRegion)
             item_list = conn.list_order_items(AmazonOrderId=order.AmazonOrderId).ListOrderItemsResult.OrderItems.OrderItem
@@ -45,10 +42,10 @@ def insert_unshipped_order():
                                  shipping_zipcode=order.ShippingAddress.PostalCode,
                                  shipping_full_addr=_addr_to_str(order.ShippingAddress),
                                  order_item_id=item.OrderItemId)
-                    print('order# {0}, item# {1}'.format(order.AmazonOrderId, item.SellerSKU))
+                    _logger.info('order# {0}, item# {1}'.format(order.AmazonOrderId, item.SellerSKU))
                 except Exception as e:
-                    print('Exception with order# {0}, item# {1}'.format(order.AmazonOrderId, item.SellerSKU))
-                    print(e)
+                    logger.error('Exception with order# {0}, item# {1}'.format(order.AmazonOrderId, item.SellerSKU))
+                    logger.exception(e)
                 time.sleep(1)
 
 def _addr_to_str(address):
@@ -85,11 +82,15 @@ def close_order():
 
     n = 0
     for order in local_order_list:
-        # print(order_dict[order.source_id].OrderStatus)
         if order_dict[order.source_id].OrderStatus == 'Shipped':
-            close_order_by_id(order.order_id)
-            n = n + 1
-    print('{} order(s) are closed.'.format(n))
+            try:
+                close_order_by_id(order.order_id)
+            except Exception as e:
+                _logger.error('Fail to close order {}'.format(order.order_id))
+                _logger.exception(e)
+            else:
+                n = n + 1
+    _logger.info('{} order(s) are closed.'.format(n))
 
 
 def upload_tracking_number():
@@ -100,9 +101,7 @@ def upload_tracking_number():
         xml_template = fd.read()
     template = Template(xml_template)
     feed_content = template.render(tracking_number_list=tn_list)
-    # print(feed_content)
-    # return
-    
+
     conn = connection.MWSConnection(Merchant=merchant_id)
     feed = conn.submit_feed(
         FeedType='_POST_ORDER_FULFILLMENT_DATA_',
@@ -113,8 +112,8 @@ def upload_tracking_number():
     )
 
     feed_info = feed.SubmitFeedResult.FeedSubmissionInfo
-    print ('Submitted product feed: ' + str(feed_info))
-    print(feed_info.FeedSubmissionId)
+    _logger.info('Submitted product feed: ' + str(feed_info))
+    # print(feed_info.FeedSubmissionId)
 
     while True:
         submission_list = conn.get_feed_submission_list(
@@ -123,16 +122,15 @@ def upload_tracking_number():
         info =  submission_list.GetFeedSubmissionListResult.FeedSubmissionInfo[0]
         id = info.FeedSubmissionId
         status = info.FeedProcessingStatus
-        print('Submission Id: {}. Current status: {}'.format(id, status))
+        _logger.info('Submission Id: {}. Current status: {}'.format(id, status))
 
         if status in ('_SUBMITTED_', '_IN_PROGRESS_', '_UNCONFIRMED_'):
-            print('Sleeping and check again....')
+            _logger.info('Sleeping and check again....')
             time.sleep(60)
         elif status == '_DONE_':
             feedResult = conn.get_feed_submission_result(FeedSubmissionId=id)
-            print(feedResult)
-            print('{} tracking number(s) uploaded.'.format(len(tn_list)))
-            close_order()
+            _logger.debug(feedResult)
+            _logger.info('{} tracking number(s) uploaded.'.format(len(tn_list)))
             break
         else:
             print("Submission processing error. Quit.", status)
@@ -194,13 +192,15 @@ _states['Wisconsin'] = 'WI'
 _states['Wyoming'] = 'WY'
 
 
-def init(flask_app, module_path, db_uri):
+def init(flask_app, module_path, db_uri, logger):
     import sys
     sys.path.append(module_path)
 
     from model.database import init_db
     init_db(flask_app, uri=db_uri)
     from service.order import get_by_source_id, insert_order, get_open_tracking_number, get_shipped_order, close_order as close_order_by_id
+    global _logger
+    _logger = logger
 
 
 if __name__ == '__main__':

@@ -116,8 +116,13 @@ def _check_cart_empty(driver):
 def create_shipment_by_batch():
     order_list = get_open_orders()
     for order in order_list:
-        shipment_id = _create_shipment(order)
-        print(order, shipment_id)
+        try:
+            shipment_id = _create_shipment(order)
+        except Exception as e:
+            _logger.error('Fail to create shipment for order {}'.format(order.order_id))
+            _logger.exception(e)
+        else:
+            _logger.info(order, shipment_id)
 
 def update_tracking_number(order_id, driver):
     order =  get_by_id(order_id)
@@ -130,14 +135,18 @@ def update_tracking_number(order_id, driver):
 
 def update_tn_by_batch():
     order_list = get_ship_ready_order()
-    # print(order_list)
     if not order_list:
         return
     driver = _init_driver()
     _login(driver)
     for order in order_list:
-        tn_list = update_tracking_number(order.order_id, driver)
-        print(order, tn_list)
+        try:
+            tn_list = update_tracking_number(order.order_id, driver)
+        except Exception as e:
+            _logger.error('Fail to update tracking number for order {}'.format(order.order_id))
+            _logger.exception(e)
+        else:
+            _logger.info(order, tn_list)
 
 def _dowload_tracking_number_old(shipment_id, driver):
     html = _download_shipment_page(shipment_id, driver)
@@ -186,13 +195,16 @@ def _download_shipment_page(shipment_id, driver):
     driver.get(_shipment_page_url.format(shipment_id))
     return driver.page_source
 
-def init(flask_app, moduel_path, db_uri):
+def init(flask_app, moduel_path, db_uri, logger):
     import sys
     sys.path.append(moduel_path)
     from model.database import init_db
 
     init_db(flask_app, db_uri)
     from service.order import get_by_source_id, update_shipment, get_open_orders, get_by_id, update_tracking_number as update_tn, get_ship_ready_order
+
+    global _logger
+    _logger = logger
 
 
 if __name__ == '__main__':
