@@ -2,7 +2,7 @@ from selenium import webdriver
 from bs4 import BeautifulSoup
 import time
 import requests
-import os
+import os, sys
 import configparser
 
 config = configparser.ConfigParser()
@@ -24,7 +24,7 @@ def _init_driver():
 
 
 def _login(driver):
-    print('login....')
+    _logger.info('login....')
     driver.find_element_by_id("sw_login").click()
     driver.find_element_by_id("psw_").clear()
     driver.find_element_by_id("psw_").send_keys(_password)
@@ -37,18 +37,18 @@ def _create_shipment(order):
     _login(driver)
 
     # driver.get(self.base_url + "/jansport-superbreak-school-backpack-multi-blue-drip-dye.html")
-    print('clear cart...')
+    _logger.info('clear cart...')
     time.sleep(3)
     driver.get(driver.base_url + '/index.php?dispatch=checkout.clear')  # clear cart
     time.sleep(3)
-    print('Add to cart...')
+    _logger.info('Add to cart...')
     driver.get(order.item.product_url)
     _check_cart_empty(driver)
     driver.find_element_by_css_selector('div.center.valign.cm-value-changer > input').clear()
     driver.find_element_by_css_selector('div.center.valign.cm-value-changer > input').send_keys(order.qty)
     driver.find_element_by_css_selector('div.buttons-container.nowrap > div > span > span > input').click()
     time.sleep(6)
-    print('Checkout...')
+    _logger.info('Checkout...')
     driver.find_element_by_link_text("Checkout").click()
     driver.find_element_by_id("coupon_field").clear()
     driver.find_element_by_id("coupon_field").send_keys("DROPSHIP")
@@ -91,7 +91,7 @@ def _create_shipment(order):
         for i in range(10):
             time.sleep(3)
             current_url = driver.current_url
-            print(i, current_url)
+            _logger.info(current_url)
             index = current_url.find('order_id=')
             if index > -1:
                 shipment_id = current_url[index + 9:]
@@ -119,10 +119,11 @@ def create_shipment_by_batch():
         try:
             shipment_id = _create_shipment(order)
         except Exception as e:
-            _logger.error('Fail to create shipment for order {}'.format(order.order_id))
-            _logger.exception(e)
+            # _logger.error('Fail to create shipment for order {}'.format(order.order_id))
+            new_e = Exception('Fail to create shipment for order {}'.format(order.order_id), e)
+            _logger.exception(new_e)
         else:
-            _logger.info(order, shipment_id)
+            _logger.info('Success: {0} {1}'.format(order, shipment_id))
 
 def update_tracking_number(order_id, driver):
     order =  get_by_id(order_id)
@@ -143,21 +144,20 @@ def update_tn_by_batch():
         try:
             tn_list = update_tracking_number(order.order_id, driver)
         except Exception as e:
-            _logger.error('Fail to update tracking number for order {}'.format(order.order_id))
-            _logger.exception(e)
+            # _logger.error('Fail to update tracking number for order {}'.format(order.order_id))
+            new_e = Exception('Fail to update tracking number for order {}'.format(order.order_id), e)
+            _logger.exception(new_e)
         else:
-            _logger.info(order, tn_list)
+            _logger.info('Success: {} {}'.format(order, tn_list))
 
-def _dowload_tracking_number_old(shipment_id, driver):
-    html = _download_shipment_page(shipment_id, driver)
-    # print(html)
-    bs = BeautifulSoup(html, 'html.parser')
-    for link in bs.find_all('a'):
-        # print(link)
-        href = link.get('href')
-        if href and href.startswith('http://trkcnfrm1.smi.usps.com'):
-            return href.split('=')[-1].strip()
-    return None
+# def _dowload_tracking_number_old(shipment_id, driver):
+#     html = _download_shipment_page(shipment_id, driver)
+#     bs = BeautifulSoup(html, 'html.parser')
+#     for link in bs.find_all('a'):
+#         href = link.get('href')
+#         if href and href.startswith('http://trkcnfrm1.smi.usps.com'):
+#             return href.split('=')[-1].strip()
+#     return None
 
 
 def _dowload_tracking_number(shipment_id, driver):
@@ -201,10 +201,16 @@ def init(flask_app, moduel_path, db_uri, logger):
     from model.database import init_db
 
     init_db(flask_app, db_uri)
-    from service.order import get_by_source_id, update_shipment, get_open_orders, get_by_id, update_tracking_number as update_tn, get_ship_ready_order
-
-    global _logger
+    # from service.order import get_by_source_id, update_shipment, get_open_orders, get_by_id, update_tracking_number as update_tn, get_ship_ready_order
+    import service.order as order_svc
+    global _logger, get_by_source_id, update_shipment, get_open_orders, get_by_id, update_tn, get_ship_ready_order
     _logger = logger
+    get_by_source_id = order_svc.get_by_source_id
+    update_shipment = order_svc.update_shipment
+    get_open_orders = order_svc.get_open_orders
+    get_by_id = order_svc.get_by_id
+    update_tn = order_svc.update_tracking_number
+    get_ship_ready_order = order_svc.get_ship_ready_order
 
 
 if __name__ == '__main__':
@@ -217,15 +223,18 @@ if __name__ == '__main__':
     # init_db(app, uri='sqlite:///../kikk.db')
 
     # from service.order import get_by_source_id, update_shipment, get_open_orders, get_by_id, update_tracking_number as update_tn, get_ship_ready_order
+    sys.path.append('../')
+
+    import common.log as logging
+    logging.config('logger.config', 'task')
 
     from flask import Flask
-    _app = flask(__name__)
-    init(_app, '../', 'sqlite:///../kikk.db')
+    _app = Flask(__name__)
 
-    print('######### Create Shipment ##########')
+    init(_app, '../', 'sqlite:///../kikk.db', logging.logger)
+
     create_shipment_by_batch()
 
-    print('######### Update Tracking Number ############')
     update_tn_by_batch()
 
 

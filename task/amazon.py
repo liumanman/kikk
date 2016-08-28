@@ -1,3 +1,4 @@
+import sys
 from boto.mws import connection
 from dateutil import parser as tp
 import time
@@ -9,11 +10,6 @@ marketplace_id = 'ATVPDKIKX0DER'
 source = 'Amazon'
 order_fulfillment_template = 'order_fulfillment_template.xml'
 
-# def init(get_by_source_id_fun, insert_order_fun):
-#     global get_by_source_id, insert_order
-#     get_by_source_id = get_by_source_id_fun
-#     insert_order = insert_order_fun
-
 
 def insert_unshipped_order():
     conn = connection.MWSConnection(Merchant=merchant_id)
@@ -24,7 +20,6 @@ def insert_unshipped_order():
         'OrderStatus': ['Unshipped', 'PartiallyShipped']
     }
     order_list = conn.list_orders(**kw).ListOrdersResult.Orders.Order
-    # item_list = conn.list_order_items(AmazonOrderId=order_list[0].AmazonOrderId)
     for order in order_list:
         if not get_by_source_id(source, order.AmazonOrderId):
             shipping_state = _short_state(order.ShippingAddress.StateOrRegion)
@@ -42,10 +37,11 @@ def insert_unshipped_order():
                                  shipping_zipcode=order.ShippingAddress.PostalCode,
                                  shipping_full_addr=_addr_to_str(order.ShippingAddress),
                                  order_item_id=item.OrderItemId)
-                    _logger.info('order# {0}, item# {1}'.format(order.AmazonOrderId, item.SellerSKU))
+                    _logger.info('Insert order: order# {0}, item# {1}'.format(order.AmazonOrderId, item.SellerSKU))
                 except Exception as e:
-                    logger.error('Exception with order# {0}, item# {1}'.format(order.AmazonOrderId, item.SellerSKU))
-                    logger.exception(e)
+                    # _logger.error('Exception with order# {0}, item# {1}'.format(order.AmazonOrderId, item.SellerSKU))
+                    new_e = Exception('Fail to insert order# {0}, item# {1}'.format(order.AmazonOrderId, item.SellerSKU), e)
+                    _logger.exception(new_e)
                 time.sleep(1)
 
 def _addr_to_str(address):
@@ -57,10 +53,6 @@ def _addr_to_str(address):
         addr_str = addr_str + '\n' + address.AddressLine3
     addr_str = addr_str + '\n{0},{1} {2}'.format(address.City, address.StateOrRegion, address.PostalCode)
     return addr_str
-
-    # return '{0}\n{1}\n{2}\n{3}\{4},{5} {6}'.format(address.Name, address.AddressLine1, address.AddressLine2,
-    #                                                address.AddressLine3, address.City, address.StateOrRegion,
-    #                                                address.PostalCode) 
 
 def _short_state(state):
     if state.title() in _states:
@@ -133,10 +125,8 @@ def upload_tracking_number():
             _logger.info('{} tracking number(s) uploaded.'.format(len(tn_list)))
             break
         else:
-            print("Submission processing error. Quit.", status)
+            _logger.error("Submission processing error. Status: {}".format(status))
             break
-
-
 
 
 _states = dict()
@@ -193,20 +183,31 @@ _states['Wyoming'] = 'WY'
 
 
 def init(flask_app, module_path, db_uri, logger):
-    import sys
     sys.path.append(module_path)
 
     from model.database import init_db
     init_db(flask_app, uri=db_uri)
-    from service.order import get_by_source_id, insert_order, get_open_tracking_number, get_shipped_order, close_order as close_order_by_id
-    global _logger
+    # from service.order import get_by_source_id, insert_order, get_open_tracking_number, get_shipped_order, close_order as close_order_by_id
+    import service.order as order_svc
+    global _logger, get_by_source_id, insert_order, get_open_tracking_number, get_shipped_order, close_order_by_id
     _logger = logger
+    get_by_source_id = order_svc.get_by_source_id
+    insert_order = order_svc.insert_order
+    get_open_tracking_number = order_svc.get_open_tracking_number
+    get_shipped_order = order_svc.get_shipped_order
+    close_order_by_id = order_svc.close_order
 
 
 if __name__ == '__main__':
+    sys.path.append('../')
+
+    import common.log as logging
+    logging.config('logger.config', 'task')
+
     from flask import Flask
     app = Flask(__name__)
-    init(app, '../', 'sqlite:///../kikk.db')
+
+    init(app, '../', 'sqlite:///../kikk.db', logging.logger)
     insert_unshipped_order()
     upload_tracking_number()
 
