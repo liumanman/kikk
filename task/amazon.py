@@ -10,6 +10,9 @@ marketplace_id = 'ATVPDKIKX0DER'
 source = 'Amazon'
 order_fulfillment_template = 'order_fulfillment_template.xml'
 
+def _sku_to_item_id(sku):
+    return sku.split('-')[0]
+
 
 def insert_unshipped_order():
     conn = connection.MWSConnection(Merchant=merchant_id)
@@ -27,7 +30,8 @@ def insert_unshipped_order():
             order_date = tp.parse(order.PurchaseDate).astimezone() 
             for item in item_list:
                 try:
-                    item_id = item.SellerSKU.split('-')[0]
+                    # item_id = item.SellerSKU.split('-')[0]
+                    item_id = _sku_to_item_id(item.SellerSKU)
                     insert_order(source=source, source_id=order.AmazonOrderId, order_date=order_date, item_id=item_id,
                                  price=int(float(item.ItemPrice.Amount)*100)/int(item.QuantityOrdered), qty=item.QuantityOrdered, customer_name=order.ShippingAddress.Name,
                                  shipping_address=order.ShippingAddress.AddressLine1,
@@ -181,6 +185,62 @@ _states['West Virginia'] = 'WV'
 _states['Wisconsin'] = 'WI'
 _states['Wyoming'] = 'WY'
 
+def _insert_single_listing(listing_from_amazon):
+    listing_dict = {}
+    listing_dict['listing_source_id'] = listing_from_amazon['listing-id']
+    listing_dict['listing_source'] = source
+    listing_dict['item_id'] = _sku_to_item_id(listing_from_amazon['seller-sku'])
+    listing_dict['q4s'] = listing_from_amazon['quantity']
+    listing_dict['price'] = int(float(listing_from_amazon['price']) * 100)
+    listing_dict['pending_qty'] = listing_from_amazon['pending-quantity']
+    listing_dict['source_item_id'] = listing_from_amazon['asin1']
+    listing_dict['listing_date'] = tp.parse(listing_from_amazon['open-date']).astimezone() 
+    
+    # listing = Listing(**listing_dict)
+    # listing.insert()
+    insert_listing(**listing_dict)
+
+def _get_list_data_from_amazon():
+    conn = connection.MWSConnection(Merchant=merchant_id)
+    # requset_resp = conn.request_report(ReportType='_GET_MERCHANT_LISTINGS_DATA_')
+    # request_id = requset_resp.RequestReportResult.ReportRequestInfo.ReportRequestId
+    # # request_status = requset_resp.RequestReportResult.ReportRequestInfo.ReportProcessingStatus
+    # report_id = None
+    # while True:
+    #     request_result = conn.get_report_request_list(ReportRequestIdList=[request_id])
+    #     info = request_result.GetReportRequestListResult.ReportRequestInfo[0]
+    #     id = info.ReportRequestId
+    #     status = info.ReportProcessingStatus
+    #     if status in ('_SUBMITTED_', '_IN_PROGRESS_'):
+    #         _logger.info('Sleeping and check again....')
+    #         time.sleep(60)
+    #     elif status in ('_DONE_', '_DONE_NO_DATA_'):
+    #         report_id = info.GeneratedReportId
+    #         break
+    #     else:
+    #         # print("Report processing error. Quit.", status)
+    #         raise Exception('Report processing error: {}'.format(status))
+        
+    # _logger.info('report id: {}'.format(report_id))
+    report = conn.get_report(ReportId='2707435438017042')
+    lines = report.decode('ISO-8859-1').strip().split('\n')
+    column_names = lines[0].split('\t')
+    # for column in column_names:
+    #     print(column)
+    listing_data = []
+    for i in range(1, len(lines)):
+        v_list = lines[i].split('\t')
+        listing_data.append({column_names[j]: v_list[j] for j in range(len(column_names))})
+    return listing_data
+
+def refresh_listing_from_amazon():
+    listing_data = _get_list_data_from_amazon()
+    for listing in listing_data:
+        try:
+            _insert_single_listing(listing)
+        except Exception as e:
+            _logger.exception(e)
+
 
 def init(flask_app, module_path, db_uri, logger):
     sys.path.append(module_path)
@@ -189,13 +249,17 @@ def init(flask_app, module_path, db_uri, logger):
     init_db(flask_app, uri=db_uri)
     # from service.order import get_by_source_id, insert_order, get_open_tracking_number, get_shipped_order, close_order as close_order_by_id
     import service.order as order_svc
+    import service.listing as listing_svc
     global _logger, get_by_source_id, insert_order, get_open_tracking_number, get_shipped_order, close_order_by_id
+    global insert_listing
     _logger = logger
     get_by_source_id = order_svc.get_by_source_id
     insert_order = order_svc.insert_order
     get_open_tracking_number = order_svc.get_open_tracking_number
     get_shipped_order = order_svc.get_shipped_order
     close_order_by_id = order_svc.close_order
+
+    insert_listing = listing_svc.insert_listing
 
 
 if __name__ == '__main__':
@@ -208,8 +272,9 @@ if __name__ == '__main__':
     app = Flask(__name__)
 
     init(app, '../', 'sqlite:///../kikk.db', logging.logger)
-    insert_unshipped_order()
-    upload_tracking_number()
+    # insert_unshipped_order()
+    # upload_tracking_number()
+    refresh_listing_from_amazon()
 
     # import sys
     # sys.path.append('../')

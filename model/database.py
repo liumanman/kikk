@@ -15,6 +15,7 @@ def init_db(app, uri='sqlite:///kikk.db'):
 
     from . import order
     from . import item
+    from . import listing
 
     db.create_all()
 

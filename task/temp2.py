@@ -5,7 +5,7 @@ merchant_id = 'A2BD7G5CIBE1BV'
 marketplace_id = 'ATVPDKIKX0DER'
 conn = connection.MWSConnection(Merchant=merchant_id)
 
-report = conn.get_report(ReportId='2657077211017035')
+report = conn.get_report(ReportId='2706708167017041')
 # with open('temp.list', 'w+b') as fd:
 #     fd.write(report)
 lines = report.decode('ISO-8859-1').strip().split('\n')
