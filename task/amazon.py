@@ -3,7 +3,7 @@ from boto.mws import connection
 from dateutil import parser as tp
 import time
 from jinja2 import Template
-
+import fantasyard
 
 merchant_id = 'A2BD7G5CIBE1BV'
 marketplace_id = 'ATVPDKIKX0DER'
@@ -192,7 +192,7 @@ def _insert_single_listing(listing_from_amazon):
     listing_dict['item_id'] = _sku_to_item_id(listing_from_amazon['seller-sku'])
     listing_dict['q4s'] = listing_from_amazon['quantity']
     listing_dict['price'] = int(float(listing_from_amazon['price']) * 100)
-    listing_dict['pending_qty'] = listing_from_amazon['pending-quantity']
+    listing_dict['pending_qty'] = int(listing_from_amazon['pending-quantity'])
     listing_dict['source_item_id'] = listing_from_amazon['asin1']
     listing_dict['listing_date'] = tp.parse(listing_from_amazon['open-date']).astimezone() 
     
@@ -201,6 +201,7 @@ def _insert_single_listing(listing_from_amazon):
     insert_listing(**listing_dict)
 
 def _get_list_data_from_amazon():
+
     conn = connection.MWSConnection(Merchant=merchant_id)
     # requset_resp = conn.request_report(ReportType='_GET_MERCHANT_LISTINGS_DATA_')
     # request_id = requset_resp.RequestReportResult.ReportRequestInfo.ReportRequestId
@@ -233,13 +234,31 @@ def _get_list_data_from_amazon():
         listing_data.append({column_names[j]: v_list[j] for j in range(len(column_names))})
     return listing_data
 
+def _insert_new_listing(listing_from_amazon):
+    for listing in listing_from_amazon:
+        try:
+            listing_in_db = get_listing_by_source_id(source, listing['listing-id'])
+            if not listing_in_db:
+                _insert_single_listing(listing)
+        except Exception as e:
+            new_e = Exception('Fail to insert listing {}'.format(listing['listing-id']), e)
+            _logger.exception(e)
+
+def _adjust_qty(listing_from_amazon):
+    all_inventory_data = fantasyard.get_inventory_data()
+    for listing in listing_from_amazon:
+        listing_in_db = get_listing_by_source_id(source, listing['listing-id'])
+        if not listing_in_db:
+            _logger.error("Can't find listing {} in db.".format(listing['listing-id']))
+            continue
+        qty = all_inventory_data[listing_in_db.item_id]
+        update_qty_by_source_id(source, listing_in_db.listing_source_id, qty, int(listing['pending-quantity']))
+        _logger.info('Qty of list {} is updated.'.format(listing_in_db.listing_source_id))
+
 def refresh_listing_from_amazon():
     listing_data = _get_list_data_from_amazon()
-    for listing in listing_data:
-        try:
-            _insert_single_listing(listing)
-        except Exception as e:
-            _logger.exception(e)
+    _insert_new_listing(listing_data)
+    _adjust_qty(listing_data)
 
 
 def init(flask_app, module_path, db_uri, logger):
@@ -251,7 +270,7 @@ def init(flask_app, module_path, db_uri, logger):
     import service.order as order_svc
     import service.listing as listing_svc
     global _logger, get_by_source_id, insert_order, get_open_tracking_number, get_shipped_order, close_order_by_id
-    global insert_listing
+    global insert_listing, get_listing_by_source_id, update_qty_by_source_id
     _logger = logger
     get_by_source_id = order_svc.get_by_source_id
     insert_order = order_svc.insert_order
@@ -260,6 +279,8 @@ def init(flask_app, module_path, db_uri, logger):
     close_order_by_id = order_svc.close_order
 
     insert_listing = listing_svc.insert_listing
+    get_listing_by_source_id = listing_svc.get_listing_by_source_id
+    update_qty_by_source_id = listing_svc.update_qty_by_source_id
 
 
 if __name__ == '__main__':

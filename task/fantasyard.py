@@ -1,9 +1,41 @@
 from selenium import webdriver
 from bs4 import BeautifulSoup
 import time
-import requests
+import functools
+
 import os, sys
 import configparser
+
+from requests.adapters import HTTPAdapter
+from requests.packages.urllib3.poolmanager import PoolManager
+import ssl
+
+
+class MyAdapter(HTTPAdapter):
+    def init_poolmanager(self, connections, maxsize, block=False):
+        self.poolmanager = PoolManager(num_pools=connections,
+                                       maxsize=maxsize,
+                                       block=block,
+                                       ssl_version=ssl.PROTOCOL_TLSv1)
+
+import requests
+s = requests.Session()
+s.mount('https://', MyAdapter())
+
+_url_for_inventory = ['https://www.fantasyard.com/portal/itemreport.php?page=1',
+           'https://www.fantasyard.com/portal/itemreport.php?page=2',
+           'https://www.fantasyard.com/portal/itemreport.php?page=3',
+           'https://www.fantasyard.com/portal/itemreport.php?page=4']    
+_headers_for_inventory_request = {
+    'Connection': 'keep-alive',
+    'Cache-Control': 'max-age=0',
+    'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; WOW64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/52.0.2743.116 Safari/537.36',
+    'Accept': 'text/html,application/xhtml+xml,application/xml;q=0.9,image/webp,*/*;q=0.8',
+    'Accept-Encoding': 'gzip, deflate, sdch, br',
+    'Accept-Language': 'en-US,en;q=0.8,zh-CN;q=0.6',
+    'Cookie': 'sess_id=6a9qk88d49bfbfaujd7jmjca93; __atuvc=3%7C33%2C1%7C34; __utma=108901013.767460202.1471373450.1472147922.1472241289.8; __utmc=108901013; __utmz=108901013.1471373450.1.1.utmcsr=(direct)|utmccn=(direct)|utmcmd=(none); show_discontinued=checked; show_smallimage_IM=checked; platform=all; verify_portal=be793d92ff36d1f41d64cd1811f0929d; username_portal=kiko',
+}
+_request_get_inventory = functools.partial(s.get, headers=_headers_for_inventory_request)
 
 config = configparser.ConfigParser()
 config.read('fantasyard.ini')
@@ -195,6 +227,24 @@ def _download_shipment_page(shipment_id, driver):
     driver.get(_shipment_page_url.format(shipment_id))
     return driver.page_source
 
+
+def get_inventory_data():
+    all_inventory_data = {}
+    for response in map(_request_get_inventory, _url_for_inventory):
+        inventory_data = _read_inventory_from_html(response.text)
+        all_inventory_data.update(inventory_data)
+    return all_inventory_data
+  
+
+def _read_inventory_from_html(html):
+    soup = BeautifulSoup(html, 'html.parser')
+    rows = soup.find_all('table')[1].find_all('tr', class_='table-row')
+    result = {}
+    for row in rows:
+        tds = row.find_all('td', recursive=False)
+        result[tds[3].string.strip()] = int(tds[6].string.strip())
+    return result
+
 def init(flask_app, moduel_path, db_uri, logger):
     import sys
     sys.path.append(moduel_path)
@@ -233,9 +283,11 @@ if __name__ == '__main__':
 
     init(_app, '../', 'sqlite:///../kikk.db', logging.logger)
 
-    create_shipment_by_batch()
+    # create_shipment_by_batch()
 
-    update_tn_by_batch()
+    # update_tn_by_batch()
+    inventory = get_inventory_data()
+    print(len(inventory))
 
 
 

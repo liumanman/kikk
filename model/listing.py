@@ -52,13 +52,18 @@ class Listing(Model):
             qty = self.qty
         if pending_qty is None:
             pending_qty =self.pending_qty
-        q4s = qty / 2 - pending_qty
+        q4s = int(qty / 2) - pending_qty
         q4s = q4s if q4s > 0 else 0
-        with db.session.begin():
-            self.qty = qty 
-            self.pending_qty = pending_qty
-            self.q4s = q4s
-            self.sync_status = Listing.SYNC_STATUS_PENDING
+        q4s = q4s if q4s < 10 else 10
+        if q4s == self.q4s and qty == self.qty:
+            return False
+        else:
+            with db.session.begin():
+                self.qty = qty 
+                self.pending_qty = pending_qty
+                self.q4s = q4s
+                self.sync_status = Listing.SYNC_STATUS_PENDING
+            return True
 
     # def update_pending_qty(self, pending_qty):
     #     pass
