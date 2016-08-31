@@ -1,0 +1,19 @@
+<?xml version="1.0" encoding="utf-8" ?> 
+<AmazonEnvelope xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xsi:noNamespaceSchemaLocation="amzn-envelope.xsd">
+    <Header>
+        <DocumentVersion>1.01</DocumentVersion> 
+        <MerchantIdentifier>A2BD7G5CIBE1BV</MerchantIdentifier> 
+    </Header>
+    <MessageType>Inventory</MessageType> 
+    {% for listing in listing_from_amazon %}
+    <Message>
+        <MessageID>{{ loop.index }}</MessageID> 
+        <OperationType>Update</OperationType> 
+        <Inventory>
+            <SKU>{{ listing['seller-sku'] }}</SKU> 
+            <Quantity>{{ listing['quantity'] }}</Quantity> 
+            <FulfillmentLatency>2</FulfillmentLatency> 
+        </Inventory>
+    </Message>
+    {% endfor %}
+</AmazonEnvelope>

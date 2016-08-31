@@ -9,6 +9,7 @@ class Listing(Model):
     listing_source = db.Column(db.String(20), nullable=False)
     item_id = db.Column(db.String(20), db.ForeignKey('item.item_id'))
     item_desc = db.Column(db.String(128), nullable=False)
+    sku = db.Column(db.String(20), nullable=False)
     q4s = db.Column(db.Integer, nullable=False)
     qty = db.Column(db.Integer)
     price = db.Column(db.Integer, nullable=False)
@@ -38,10 +39,11 @@ class Listing(Model):
         if not self.item_id:
             raise Exception("item id can't be null.")
         item = Item.get_by_id(self.item_id)
-        if not item:
-            raise Exception("Can't find item {}.".format(self.item_id))
+        # if not item:
+        #     raise Exception("Can't find item {}.".format(self.item_id))
         with db.session.begin():
-            self.item_desc = item.description
+            self.item_desc = item.description if item else self.item_id
+            # self.item_desc = item.description
             self.status = Listing.STATUS_OPEN
             self.in_date = datetime.now()
             self.sync_status = Listing.SYNC_STATUS_DONE

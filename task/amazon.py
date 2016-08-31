@@ -10,6 +10,41 @@ marketplace_id = 'ATVPDKIKX0DER'
 source = 'Amazon'
 order_fulfillment_template = 'order_fulfillment_template.xml'
 
+def _submint_feed(feed_type, feed_content):
+    conn = connection.MWSConnection(Merchant=merchant_id)
+    feed = conn.submit_feed(
+        FeedType=feed_type,
+        PurgeAndReplace=False,
+        MarketplaceIdList=[marketplace_id],
+        content_type='text/xml',
+        FeedContent=feed_content.encode('utf-8')
+    )
+
+    feed_info = feed.SubmitFeedResult.FeedSubmissionInfo
+    _logger.info('Submitted product feed: ' + str(feed_info))
+    # print(feed_info.FeedSubmissionId)
+
+    while True:
+        submission_list = conn.get_feed_submission_list(
+            FeedSubmissionIdList=[feed_info.FeedSubmissionId]
+        )
+        info =  submission_list.GetFeedSubmissionListResult.FeedSubmissionInfo[0]
+        id = info.FeedSubmissionId
+        status = info.FeedProcessingStatus
+        _logger.info('Submission Id: {}. Current status: {}'.format(id, status))
+
+        if status in ('_SUBMITTED_', '_IN_PROGRESS_', '_UNCONFIRMED_'):
+            _logger.info('Sleeping and check again....')
+            time.sleep(60)
+        elif status == '_DONE_':
+            feedResult = conn.get_feed_submission_result(FeedSubmissionId=id)
+            _logger.debug(feedResult)
+            # _logger.info('{} tracking number(s) uploaded.'.format(len(tn_list)))
+            break
+        else:
+            _logger.error("Submission processing error. Status: {}".format(status))
+            break
+
 def _sku_to_item_id(sku):
     return sku.split('-')[0]
 
@@ -98,39 +133,42 @@ def upload_tracking_number():
     template = Template(xml_template)
     feed_content = template.render(tracking_number_list=tn_list)
 
-    conn = connection.MWSConnection(Merchant=merchant_id)
-    feed = conn.submit_feed(
-        FeedType='_POST_ORDER_FULFILLMENT_DATA_',
-        PurgeAndReplace=False,
-        MarketplaceIdList=[marketplace_id],
-        content_type='text/xml',
-        FeedContent=feed_content.encode('utf-8')
-    )
+    _submint_feed('_POST_ORDER_FULFILLMENT_DATA_', feed_content)
+    _logger.info('{} tracking number(s) uploaded.'.format(len(tn_list)))
 
-    feed_info = feed.SubmitFeedResult.FeedSubmissionInfo
-    _logger.info('Submitted product feed: ' + str(feed_info))
-    # print(feed_info.FeedSubmissionId)
+    # conn = connection.MWSConnection(Merchant=merchant_id)
+    # feed = conn.submit_feed(
+    #     FeedType='_POST_ORDER_FULFILLMENT_DATA_',
+    #     PurgeAndReplace=False,
+    #     MarketplaceIdList=[marketplace_id],
+    #     content_type='text/xml',
+    #     FeedContent=feed_content.encode('utf-8')
+    # )
 
-    while True:
-        submission_list = conn.get_feed_submission_list(
-            FeedSubmissionIdList=[feed_info.FeedSubmissionId]
-        )
-        info =  submission_list.GetFeedSubmissionListResult.FeedSubmissionInfo[0]
-        id = info.FeedSubmissionId
-        status = info.FeedProcessingStatus
-        _logger.info('Submission Id: {}. Current status: {}'.format(id, status))
+    # feed_info = feed.SubmitFeedResult.FeedSubmissionInfo
+    # _logger.info('Submitted product feed: ' + str(feed_info))
+    # # print(feed_info.FeedSubmissionId)
 
-        if status in ('_SUBMITTED_', '_IN_PROGRESS_', '_UNCONFIRMED_'):
-            _logger.info('Sleeping and check again....')
-            time.sleep(60)
-        elif status == '_DONE_':
-            feedResult = conn.get_feed_submission_result(FeedSubmissionId=id)
-            _logger.debug(feedResult)
-            _logger.info('{} tracking number(s) uploaded.'.format(len(tn_list)))
-            break
-        else:
-            _logger.error("Submission processing error. Status: {}".format(status))
-            break
+    # while True:
+    #     submission_list = conn.get_feed_submission_list(
+    #         FeedSubmissionIdList=[feed_info.FeedSubmissionId]
+    #     )
+    #     info =  submission_list.GetFeedSubmissionListResult.FeedSubmissionInfo[0]
+    #     id = info.FeedSubmissionId
+    #     status = info.FeedProcessingStatus
+    #     _logger.info('Submission Id: {}. Current status: {}'.format(id, status))
+
+    #     if status in ('_SUBMITTED_', '_IN_PROGRESS_', '_UNCONFIRMED_'):
+    #         _logger.info('Sleeping and check again....')
+    #         time.sleep(60)
+    #     elif status == '_DONE_':
+    #         feedResult = conn.get_feed_submission_result(FeedSubmissionId=id)
+    #         _logger.debug(feedResult)
+    #         _logger.info('{} tracking number(s) uploaded.'.format(len(tn_list)))
+    #         break
+    #     else:
+    #         _logger.error("Submission processing error. Status: {}".format(status))
+    #         break
 
 
 _states = dict()
@@ -190,11 +228,13 @@ def _insert_single_listing(listing_from_amazon):
     listing_dict['listing_source_id'] = listing_from_amazon['listing-id']
     listing_dict['listing_source'] = source
     listing_dict['item_id'] = _sku_to_item_id(listing_from_amazon['seller-sku'])
+    listing_dict['sku'] = listing_from_amazon['seller-sku']
     listing_dict['q4s'] = listing_from_amazon['quantity']
     listing_dict['price'] = int(float(listing_from_amazon['price']) * 100)
     listing_dict['pending_qty'] = int(listing_from_amazon['pending-quantity'])
     listing_dict['source_item_id'] = listing_from_amazon['asin1']
     listing_dict['listing_date'] = tp.parse(listing_from_amazon['open-date']).astimezone() 
+    listing_dict['qty'] = listing_from_amazon['qty']
     
     # listing = Listing(**listing_dict)
     # listing.insert()
@@ -203,27 +243,27 @@ def _insert_single_listing(listing_from_amazon):
 def _get_list_data_from_amazon():
 
     conn = connection.MWSConnection(Merchant=merchant_id)
-    # requset_resp = conn.request_report(ReportType='_GET_MERCHANT_LISTINGS_DATA_')
-    # request_id = requset_resp.RequestReportResult.ReportRequestInfo.ReportRequestId
-    # # request_status = requset_resp.RequestReportResult.ReportRequestInfo.ReportProcessingStatus
+    requset_resp = conn.request_report(ReportType='_GET_MERCHANT_LISTINGS_DATA_')
+    request_id = requset_resp.RequestReportResult.ReportRequestInfo.ReportRequestId
+    # request_status = requset_resp.RequestReportResult.ReportRequestInfo.ReportProcessingStatus
     # report_id = None
-    # while True:
-    #     request_result = conn.get_report_request_list(ReportRequestIdList=[request_id])
-    #     info = request_result.GetReportRequestListResult.ReportRequestInfo[0]
-    #     id = info.ReportRequestId
-    #     status = info.ReportProcessingStatus
-    #     if status in ('_SUBMITTED_', '_IN_PROGRESS_'):
-    #         _logger.info('Sleeping and check again....')
-    #         time.sleep(60)
-    #     elif status in ('_DONE_', '_DONE_NO_DATA_'):
-    #         report_id = info.GeneratedReportId
-    #         break
-    #     else:
-    #         # print("Report processing error. Quit.", status)
-    #         raise Exception('Report processing error: {}'.format(status))
+    while True:
+        request_result = conn.get_report_request_list(ReportRequestIdList=[request_id])
+        info = request_result.GetReportRequestListResult.ReportRequestInfo[0]
+        id = info.ReportRequestId
+        status = info.ReportProcessingStatus
+        if status in ('_SUBMITTED_', '_IN_PROGRESS_'):
+            _logger.info('Sleeping and check again....')
+            time.sleep(60)
+        elif status in ('_DONE_', '_DONE_NO_DATA_'):
+            report_id = info.GeneratedReportId
+            break
+        else:
+            # print("Report processing error. Quit.", status)
+            raise Exception('Report processing error: {}'.format(status))
         
-    # _logger.info('report id: {}'.format(report_id))
-    report = conn.get_report(ReportId='2707435438017042')
+    _logger.info('report id: {}'.format(report_id))
+    report = conn.get_report(ReportId=report_id)
     lines = report.decode('ISO-8859-1').strip().split('\n')
     column_names = lines[0].split('\t')
     # for column in column_names:
@@ -232,19 +272,21 @@ def _get_list_data_from_amazon():
     for i in range(1, len(lines)):
         v_list = lines[i].split('\t')
         listing_data.append({column_names[j]: v_list[j] for j in range(len(column_names))})
+        listing = listing_data[-1]
+        listing['item-id'] = _sku_to_item_id(listing['seller-sku'])
     return listing_data
 
-def _insert_new_listing(listing_from_amazon):
-    for listing in listing_from_amazon:
-        try:
-            listing_in_db = get_listing_by_source_id(source, listing['listing-id'])
-            if not listing_in_db:
-                _insert_single_listing(listing)
-        except Exception as e:
-            new_e = Exception('Fail to insert listing {}'.format(listing['listing-id']), e)
-            _logger.exception(e)
+# def _insert_new_listing(listing_from_amazon):
+#     for listing in listing_from_amazon:
+#         try:
+#             listing_in_db = get_listing_by_source_id(source, listing['listing-id'])
+#             if not listing_in_db:
+#                 _insert_single_listing(listing)
+#         except Exception as e:
+#             new_e = Exception('Fail to insert listing {}'.format(listing['listing-id']), e)
+#             _logger.exception(e)
 
-def _adjust_qty(listing_from_amazon):
+def _adjust_qty_old(listing_from_amazon):
     all_inventory_data = fantasyard.get_inventory_data()
     for listing in listing_from_amazon:
         listing_in_db = get_listing_by_source_id(source, listing['listing-id'])
@@ -255,10 +297,56 @@ def _adjust_qty(listing_from_amazon):
         update_qty_by_source_id(source, listing_in_db.listing_source_id, qty, int(listing['pending-quantity']))
         _logger.info('Qty of list {} is updated.'.format(listing_in_db.listing_source_id))
 
+def _adjust_q4s(listing_from_amazon):
+    all_inventory_data = fantasyard.get_inventory_data()
+    changed = []
+    for listing in listing_from_amazon:
+        qty = all_inventory_data[listing['item-id']]
+        listing['qty'] = qty
+        if qty < 10:
+            q4s = 0
+        else:
+            q4s = int(qty / 2) - int(listing['pending-quantity'])
+            q4s = q4s if q4s > 0 else 0
+            q4s = q4s if q4s < 10 else 9
+        # q4s = 125
+        if int(listing['quantity']) != q4s:
+            listing['quantity'] = q4s
+            changed.append(listing)
+    _upload_q4s(changed)
+
+def _upload_q4s(listing_from_amazon):
+    if not listing_from_amazon:
+        return
+    with open('inventory_update_template.xml') as fd:
+        xml_template = fd.read()
+    template = Template(xml_template)
+    feed_content = template.render(listing_from_amazon=listing_from_amazon)
+    print(feed_content)
+    # _submint_feed('_POST_ORDER_FULFILLMENT_DATA_', feed_content)
+    _logger.info('{} listing(s) uploaded.'.format(len(listing_from_amazon)))
+
+
+def _save_listing(listing_from_amazon):
+    for listing in listing_from_amazon:
+        try:
+            listing_in_db = get_listing_by_source_id(source, listing['listing-id'])
+            if listing_in_db:
+                listing_in_db.q4s = listing['quantity']
+                listing_in_db.price = int(float(listing['price']) * 100)
+                listing_in_db.pending_qty = int(listing['pending-quantity'])
+                listing_in_db.qty = listing['qty']
+            else:
+                _insert_single_listing(listing)
+        except Exception as e:
+            _logger.exception(e)
+
+
 def refresh_listing_from_amazon():
     listing_data = _get_list_data_from_amazon()
-    _insert_new_listing(listing_data)
-    _adjust_qty(listing_data)
+    _adjust_q4s(listing_data)
+    _save_listing(listing_data)
+
 
 
 def init(flask_app, module_path, db_uri, logger):
