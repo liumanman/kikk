@@ -9,6 +9,7 @@ merchant_id = 'A2BD7G5CIBE1BV'
 marketplace_id = 'ATVPDKIKX0DER'
 source = 'Amazon'
 order_fulfillment_template = 'order_fulfillment_template.xml'
+adjust_q4s_bypass_list = ['T50109P','T50109P-2']
 
 def _submint_feed(feed_type, feed_content):
     conn = connection.MWSConnection(Merchant=merchant_id)
@@ -240,40 +241,51 @@ def _insert_single_listing(listing_from_amazon):
     # listing.insert()
     insert_listing(**listing_dict)
 
-def _get_list_data_from_amazon():
-
+def _get_listing_data_from_amazon():
     conn = connection.MWSConnection(Merchant=merchant_id)
-    requset_resp = conn.request_report(ReportType='_GET_MERCHANT_LISTINGS_DATA_')
-    request_id = requset_resp.RequestReportResult.ReportRequestInfo.ReportRequestId
-    # request_status = requset_resp.RequestReportResult.ReportRequestInfo.ReportProcessingStatus
-    # report_id = None
-    while True:
-        request_result = conn.get_report_request_list(ReportRequestIdList=[request_id])
-        info = request_result.GetReportRequestListResult.ReportRequestInfo[0]
-        id = info.ReportRequestId
-        status = info.ReportProcessingStatus
-        if status in ('_SUBMITTED_', '_IN_PROGRESS_'):
-            _logger.info('Sleeping and check again....')
-            time.sleep(60)
-        elif status in ('_DONE_', '_DONE_NO_DATA_'):
-            report_id = info.GeneratedReportId
-            break
-        else:
-            # print("Report processing error. Quit.", status)
-            raise Exception('Report processing error: {}'.format(status))
+    # requset_resp = conn.request_report(ReportType='_GET_MERCHANT_LISTINGS_DATA_')
+    # request_id = requset_resp.RequestReportResult.ReportRequestInfo.ReportRequestId
+    # # request_status = requset_resp.RequestReportResult.ReportRequestInfo.ReportProcessingStatus
+    # # report_id = None
+    # while True:
+    #     request_result = conn.get_report_request_list(ReportRequestIdList=[request_id])
+    #     info = request_result.GetReportRequestListResult.ReportRequestInfo[0]
+    #     id = info.ReportRequestId
+    #     status = info.ReportProcessingStatus
+    #     if status in ('_SUBMITTED_', '_IN_PROGRESS_'):
+    #         _logger.info('Sleeping and check again....')
+    #         time.sleep(60)
+    #     elif status in ('_DONE_', '_DONE_NO_DATA_'):
+    #         report_id = info.GeneratedReportId
+    #         break
+    #     else:
+    #         # print("Report processing error. Quit.", status)
+    #         raise Exception('Report processing error: {}'.format(status))
         
-    _logger.info('report id: {}'.format(report_id))
-    report = conn.get_report(ReportId=report_id)
+    # _logger.info('report id: {}'.format(report_id))
+    report = conn.get_report(ReportId=2723618899017044)
+    # with open('report', 'b+w') as fd:
+    #     fd.write(report)
     lines = report.decode('ISO-8859-1').strip().split('\n')
     column_names = lines[0].split('\t')
     # for column in column_names:
     #     print(column)
+    item_qty_in_pending = _get_item_qty_in_pending()
     listing_data = []
+    item_listing_qty = {}
     for i in range(1, len(lines)):
         v_list = lines[i].split('\t')
         listing_data.append({column_names[j]: v_list[j] for j in range(len(column_names))})
         listing = listing_data[-1]
         listing['item-id'] = _sku_to_item_id(listing['seller-sku'])
+        listing['pending-quantity'] = item_qty_in_pending.get(listing['seller-sku'], 0)
+        if listing['item-id'] in item_listing_qty:
+            item_listing_qty[listing['item-id']] += 1
+        else:
+            item_listing_qty[listing['item-id']] = 1
+
+    for listing in listing_data:
+        listing['item-listing-qty'] = item_listing_qty[listing['item-id']]
     return listing_data
 
 # def _insert_new_listing(listing_from_amazon):
@@ -297,16 +309,39 @@ def _adjust_qty_old(listing_from_amazon):
         update_qty_by_source_id(source, listing_in_db.listing_source_id, qty, int(listing['pending-quantity']))
         _logger.info('Qty of list {} is updated.'.format(listing_in_db.listing_source_id))
 
+def _get_item_qty_in_pending():
+    conn = connection.MWSConnection(Merchant=merchant_id)
+
+    kw = {
+        'CreatedAfter': '2016-07-01T18:12:21',
+        'MarketplaceId': [marketplace_id],
+        'OrderStatus': ['Pending']
+    }
+    result = {}
+    order_list = conn.list_orders(**kw).ListOrdersResult.Orders.Order
+    for order in order_list:
+        item_list = conn.list_order_items(AmazonOrderId=order.AmazonOrderId).ListOrderItemsResult.OrderItems.OrderItem
+        for item in item_list:
+            if item.SellerSKU in result:
+                result[item.SellerSKU] += int(item.QuantityOrdered)
+            else:
+                result[item.SellerSKU] = int(item.QuantityOrdered)
+    return result
+    
 def _adjust_q4s(listing_from_amazon):
     all_inventory_data = fantasyard.get_inventory_data()
+    # item_qty_in_pending = _get_item_qty_in_pending()
     changed = []
     for listing in listing_from_amazon:
         qty = all_inventory_data[listing['item-id']]
         listing['qty'] = qty
+        if listing['seller-sku'] in adjust_q4s_bypass_list:
+            continue
         if qty < 10:
             q4s = 0
         else:
-            q4s = int(qty / 2) - int(listing['pending-quantity'])
+            # pending_qty = item_qty_in_pending.get(listing['seller-sku'], 0)
+            q4s = int(qty / 2 / listing['item-listing-qty']) - listing['pending-quantity'] 
             q4s = q4s if q4s > 0 else 0
             q4s = q4s if q4s < 10 else 9
         # q4s = 125
@@ -343,7 +378,7 @@ def _save_listing(listing_from_amazon):
 
 
 def refresh_listing_from_amazon():
-    listing_data = _get_list_data_from_amazon()
+    listing_data = _get_listing_data_from_amazon()
     _adjust_q4s(listing_data)
     _save_listing(listing_data)
 

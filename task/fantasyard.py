@@ -10,6 +10,12 @@ from requests.adapters import HTTPAdapter
 from requests.packages.urllib3.poolmanager import PoolManager
 import ssl
 
+# config = configparser.ConfigParser()
+config = configparser.RawConfigParser()
+config.read('fantasyard.ini')
+_email = config['Default']['email'] 
+_password = config['Default']['password'] 
+_cookie = config['Default']['cookie']
 
 class MyAdapter(HTTPAdapter):
     def init_poolmanager(self, connections, maxsize, block=False):
@@ -33,15 +39,10 @@ _headers_for_inventory_request = {
     'Accept': 'text/html,application/xhtml+xml,application/xml;q=0.9,image/webp,*/*;q=0.8',
     'Accept-Encoding': 'gzip, deflate, sdch, br',
     'Accept-Language': 'en-US,en;q=0.8,zh-CN;q=0.6',
-    'Cookie': 'sess_id=6a9qk88d49bfbfaujd7jmjca93; __atuvc=3%7C33%2C1%7C34; __utma=108901013.767460202.1471373450.1472147922.1472241289.8; __utmc=108901013; __utmz=108901013.1471373450.1.1.utmcsr=(direct)|utmccn=(direct)|utmcmd=(none); show_discontinued=checked; show_smallimage_IM=checked; platform=all; verify_portal=be793d92ff36d1f41d64cd1811f0929d; username_portal=kiko',
+    'Cookie': _cookie 
 }
 _request_get_inventory = functools.partial(s.get, headers=_headers_for_inventory_request)
 
-config = configparser.ConfigParser()
-config.read('fantasyard.ini')
-
-_email = config['Default']['email'] 
-_password = config['Default']['password'] 
 _shipment_page_url = 'https://www.fantasyard.com/index.php?dispatch=orders.details&order_id={}'
 
 def _init_driver():
