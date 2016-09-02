@@ -98,3 +98,4 @@ kikk.sublime-workspace
 task/screenshot/*
 .vscode/
 kikk.db*
+.idea/

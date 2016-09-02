@@ -3,15 +3,26 @@ from boto.mws import connection
 from dateutil import parser as tp
 import time
 from jinja2 import Template
-import fantasyard
+import requests
+from bs4 import BeautifulSoup
+import task.fantasyard as fantasyard
 
 merchant_id = 'A2BD7G5CIBE1BV'
 marketplace_id = 'ATVPDKIKX0DER'
 source = 'Amazon'
 order_fulfillment_template = 'order_fulfillment_template.xml'
-adjust_q4s_bypass_list = ['T50109P','T50109P-2']
+adjust_q4s_bypass_list = ['T50109P', 'T50109P-2']
 
-def _submint_feed(feed_type, feed_content):
+headers_for_get_prices = {
+    'User-Agent': 'Mozilla/5.0 (X11; Ubuntu; Linux x86_64; rv:48.0) Gecko/20100101 Firefox/48.0',
+    'Accept': 'text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8',
+    'Accept-Language': 'en-US,en;q=0.5',
+    'Accept-Encoding': 'gzip, deflate, br',
+    'Connection': 'keep-alive',
+    'Upgrade-Insecure-Requests': '1'
+}
+
+def _submit_feed(feed_type, feed_content):
     conn = connection.MWSConnection(Merchant=merchant_id)
     feed = conn.submit_feed(
         FeedType=feed_type,
@@ -29,7 +40,7 @@ def _submint_feed(feed_type, feed_content):
         submission_list = conn.get_feed_submission_list(
             FeedSubmissionIdList=[feed_info.FeedSubmissionId]
         )
-        info =  submission_list.GetFeedSubmissionListResult.FeedSubmissionInfo[0]
+        info = submission_list.GetFeedSubmissionListResult.FeedSubmissionInfo[0]
         id = info.FeedSubmissionId
         status = info.FeedProcessingStatus
         _logger.info('Submission Id: {}. Current status: {}'.format(id, status))
@@ -38,13 +49,14 @@ def _submint_feed(feed_type, feed_content):
             _logger.info('Sleeping and check again....')
             time.sleep(60)
         elif status == '_DONE_':
-            feedResult = conn.get_feed_submission_result(FeedSubmissionId=id)
-            _logger.debug(feedResult)
+            feed_result = conn.get_feed_submission_result(FeedSubmissionId=id)
+            _logger.debug(feed_result)
             # _logger.info('{} tracking number(s) uploaded.'.format(len(tn_list)))
             break
         else:
             _logger.error("Submission processing error. Status: {}".format(status))
             break
+
 
 def _sku_to_item_id(sku):
     return sku.split('-')[0]
@@ -62,16 +74,19 @@ def insert_unshipped_order():
     for order in order_list:
         if not get_by_source_id(source, order.AmazonOrderId):
             shipping_state = _short_state(order.ShippingAddress.StateOrRegion)
-            item_list = conn.list_order_items(AmazonOrderId=order.AmazonOrderId).ListOrderItemsResult.OrderItems.OrderItem
-            order_date = tp.parse(order.PurchaseDate).astimezone() 
+            item_list = conn.list_order_items(
+                AmazonOrderId=order.AmazonOrderId).ListOrderItemsResult.OrderItems.OrderItem
+            order_date = tp.parse(order.PurchaseDate).astimezone()
             for item in item_list:
                 try:
                     # item_id = item.SellerSKU.split('-')[0]
                     item_id = _sku_to_item_id(item.SellerSKU)
                     insert_order(source=source, source_id=order.AmazonOrderId, order_date=order_date, item_id=item_id,
-                                 price=int(float(item.ItemPrice.Amount)*100)/int(item.QuantityOrdered), qty=item.QuantityOrdered, customer_name=order.ShippingAddress.Name,
+                                 price=int(float(item.ItemPrice.Amount) * 100) / int(item.QuantityOrdered),
+                                 qty=item.QuantityOrdered, customer_name=order.ShippingAddress.Name,
                                  shipping_address=order.ShippingAddress.AddressLine1,
-                                 shipping_address2='{0} {1}'.format(getattr(order.ShippingAddress, 'AddressLine2', ''),getattr(order.ShippingAddress, 'AddressLine3', '')), 
+                                 shipping_address2='{0} {1}'.format(getattr(order.ShippingAddress, 'AddressLine2', ''),
+                                                                    getattr(order.ShippingAddress, 'AddressLine3', '')),
                                  shipping_city=order.ShippingAddress.City,
                                  shipping_state=shipping_state,
                                  shipping_zipcode=order.ShippingAddress.PostalCode,
@@ -80,9 +95,11 @@ def insert_unshipped_order():
                     _logger.info('Insert order: order# {0}, item# {1}'.format(order.AmazonOrderId, item.SellerSKU))
                 except Exception as e:
                     # _logger.error('Exception with order# {0}, item# {1}'.format(order.AmazonOrderId, item.SellerSKU))
-                    new_e = Exception('Fail to insert order# {0}, item# {1}'.format(order.AmazonOrderId, item.SellerSKU), e)
+                    new_e = Exception(
+                        'Fail to insert order# {0}, item# {1}'.format(order.AmazonOrderId, item.SellerSKU), e)
                     _logger.exception(new_e)
                 time.sleep(1)
+
 
 def _addr_to_str(address):
     attr_list = dir(address)
@@ -91,8 +108,9 @@ def _addr_to_str(address):
         addr_str = addr_str + '\n' + address.AddressLine2
     if 'AddressLine3' in attr_list:
         addr_str = addr_str + '\n' + address.AddressLine3
-    addr_str = addr_str + '\n{0},{1} {2}'.format(address.City, address.StateOrRegion, address.PostalCode)
+    addr_str += '\n{0},{1} {2}'.format(address.City, address.StateOrRegion, address.PostalCode)
     return addr_str
+
 
 def _short_state(state):
     if state.title() in _states:
@@ -121,7 +139,7 @@ def close_order():
                 _logger.error('Fail to close order {}'.format(order.order_id))
                 _logger.exception(e)
             else:
-                n = n + 1
+                n += 1
     _logger.info('{} order(s) are closed.'.format(n))
 
 
@@ -134,7 +152,7 @@ def upload_tracking_number():
     template = Template(xml_template)
     feed_content = template.render(tracking_number_list=tn_list)
 
-    _submint_feed('_POST_ORDER_FULFILLMENT_DATA_', feed_content)
+    _submit_feed('_POST_ORDER_FULFILLMENT_DATA_', feed_content)
     _logger.info('{} tracking number(s) uploaded.'.format(len(tn_list)))
 
     # conn = connection.MWSConnection(Merchant=merchant_id)
@@ -224,28 +242,27 @@ _states['West Virginia'] = 'WV'
 _states['Wisconsin'] = 'WI'
 _states['Wyoming'] = 'WY'
 
+
 def _insert_single_listing(listing_from_amazon):
-    listing_dict = {}
-    listing_dict['listing_source_id'] = listing_from_amazon['listing-id']
-    listing_dict['listing_source'] = source
-    listing_dict['item_id'] = _sku_to_item_id(listing_from_amazon['seller-sku'])
-    listing_dict['sku'] = listing_from_amazon['seller-sku']
-    listing_dict['q4s'] = listing_from_amazon['quantity']
-    listing_dict['price'] = int(float(listing_from_amazon['price']) * 100)
-    listing_dict['pending_qty'] = int(listing_from_amazon['pending-quantity'])
-    listing_dict['source_item_id'] = listing_from_amazon['asin1']
-    listing_dict['listing_date'] = tp.parse(listing_from_amazon['open-date']).astimezone() 
-    listing_dict['qty'] = listing_from_amazon['qty']
-    
+    listing_dict = {'listing_source_id': listing_from_amazon['listing-id'], 'listing_source': source,
+                    'item_id': _sku_to_item_id(listing_from_amazon['seller-sku']),
+                    'sku': listing_from_amazon['seller-sku'], 'q4s': listing_from_amazon['quantity'],
+                    'price': int(float(listing_from_amazon['price']) * 100),
+                    'pending_qty': int(listing_from_amazon['pending-quantity']),
+                    'source_item_id': listing_from_amazon['asin1'],
+                    'listing_date': tp.parse(listing_from_amazon['open-date']).astimezone(),
+                    'qty': listing_from_amazon['qty']}
+
     # listing = Listing(**listing_dict)
     # listing.insert()
     insert_listing(**listing_dict)
 
+
 def _get_listing_data_from_amazon():
     conn = connection.MWSConnection(Merchant=merchant_id)
-    # requset_resp = conn.request_report(ReportType='_GET_MERCHANT_LISTINGS_DATA_')
-    # request_id = requset_resp.RequestReportResult.ReportRequestInfo.ReportRequestId
-    # # request_status = requset_resp.RequestReportResult.ReportRequestInfo.ReportProcessingStatus
+    # request_resp = conn.request_report(ReportType='_GET_MERCHANT_LISTINGS_DATA_')
+    # request_id = request_resp.RequestReportResult.ReportRequestInfo.ReportRequestId
+    # # request_status = request_resp.RequestReportResult.ReportRequestInfo.ReportProcessingStatus
     # # report_id = None
     # while True:
     #     request_result = conn.get_report_request_list(ReportRequestIdList=[request_id])
@@ -261,7 +278,7 @@ def _get_listing_data_from_amazon():
     #     else:
     #         # print("Report processing error. Quit.", status)
     #         raise Exception('Report processing error: {}'.format(status))
-        
+
     # _logger.info('report id: {}'.format(report_id))
     report = conn.get_report(ReportId=2723618899017044)
     # with open('report', 'b+w') as fd:
@@ -288,6 +305,7 @@ def _get_listing_data_from_amazon():
         listing['item-listing-qty'] = item_listing_qty[listing['item-id']]
     return listing_data
 
+
 # def _insert_new_listing(listing_from_amazon):
 #     for listing in listing_from_amazon:
 #         try:
@@ -309,6 +327,7 @@ def _adjust_qty_old(listing_from_amazon):
         update_qty_by_source_id(source, listing_in_db.listing_source_id, qty, int(listing['pending-quantity']))
         _logger.info('Qty of list {} is updated.'.format(listing_in_db.listing_source_id))
 
+
 def _get_item_qty_in_pending():
     conn = connection.MWSConnection(Merchant=merchant_id)
 
@@ -327,7 +346,8 @@ def _get_item_qty_in_pending():
             else:
                 result[item.SellerSKU] = int(item.QuantityOrdered)
     return result
-    
+
+
 def _adjust_q4s(listing_from_amazon):
     all_inventory_data = fantasyard.get_inventory_data()
     # item_qty_in_pending = _get_item_qty_in_pending()
@@ -341,7 +361,7 @@ def _adjust_q4s(listing_from_amazon):
             q4s = 0
         else:
             # pending_qty = item_qty_in_pending.get(listing['seller-sku'], 0)
-            q4s = int(qty / 2 / listing['item-listing-qty']) - listing['pending-quantity'] 
+            q4s = int(qty / 2 / listing['item-listing-qty']) - listing['pending-quantity']
             q4s = q4s if q4s > 0 else 0
             q4s = q4s if q4s < 10 else 9
         # q4s = 125
@@ -349,6 +369,7 @@ def _adjust_q4s(listing_from_amazon):
             listing['quantity'] = q4s
             changed.append(listing)
     _upload_q4s(changed)
+
 
 def _upload_q4s(listing_from_amazon):
     if not listing_from_amazon:
@@ -358,8 +379,9 @@ def _upload_q4s(listing_from_amazon):
     template = Template(xml_template)
     feed_content = template.render(listing_from_amazon=listing_from_amazon)
     print(feed_content)
-    # _submint_feed('_POST_ORDER_FULFILLMENT_DATA_', feed_content)
+    # _submit_feed('_POST_ORDER_FULFILLMENT_DATA_', feed_content)
     _logger.info('{} listing(s) uploaded.'.format(len(listing_from_amazon)))
+
 
 
 def _save_listing(listing_from_amazon):
@@ -381,6 +403,45 @@ def refresh_listing_from_amazon():
     listing_data = _get_listing_data_from_amazon()
     _adjust_q4s(listing_data)
     _save_listing(listing_data)
+
+
+def _get_listing_prices(asin):
+    r = requests.get('https://www.amazon.com/dp/{}'.format(asin), headers=headers_for_get_prices)
+    bs = BeautifulSoup(r.text, 'html.parser')
+    div_list = bs.find_all('div', class_='a-box mbc-offer-row pa_mbc_on_amazon_offer')
+    price_list = []
+    for div in div_list:
+        price = div.find('span', class_='a-size-medium a-color-price').string.strip()
+        seller = div.find('span', class_='a-size-small mbcMerchantName').string.strip()
+        shipping_contents = div.find('span', class_='a-size-small a-color-secondary').descendants
+        shipping_contents = [c for c in shipping_contents if isinstance(c, str)]
+        shipping_fee = _parser_shipping_fee(shipping_contents)
+        if shipping_fee is None:
+            continue
+        o = type('', (object,), {})
+        o.price = price
+        o.seller = seller
+        o.shipping = shipping_fee
+        price_list.append(o)
+    return price_list
+
+
+def _parser_shipping_fee(contents):
+    show_free_shipping = False
+    price = None
+    for c in contents:
+        c2 = c.upper()
+        if 'OVER' in c2:
+            return None
+        elif 'FREE SHIPPING' in c2:
+            show_free_shipping = True
+        else:
+            for c3 in c2.split('\xa0'):
+                if '$' in c3:
+                    price = c3
+    if not show_free_shipping and not price:
+        raise Exception('Fail to parser shipping fee, contents:{}'.format(contents))
+    return '0.00' if show_free_shipping else price
 
 
 
@@ -410,16 +471,19 @@ if __name__ == '__main__':
     sys.path.append('../')
 
     import common.log as logging
+
     logging.config('logger.config', 'task')
 
     from flask import Flask
+
     app = Flask(__name__)
 
     init(app, '../', 'sqlite:///../kikk.db', logging.logger)
     # insert_unshipped_order()
     # upload_tracking_number()
-    refresh_listing_from_amazon()
+    # refresh_listing_from_amazon()
 
+    print([(i.price, i.shipping, i.seller) for i in _get_listing_prices('B015TP5L4K')])
     # import sys
     # sys.path.append('../')
     # from flask import Flask

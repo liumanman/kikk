@@ -13,6 +13,8 @@ class Listing(Model):
     q4s = db.Column(db.Integer, nullable=False)
     qty = db.Column(db.Integer)
     price = db.Column(db.Integer, nullable=False)
+    min_price = db.Column(db.Integer)
+    regular_price = db.Column(db.Integer)
     pending_qty = db.Column(db.Integer, nullable=False)
     source_item_id = db.Column(db.String(20), nullable=True)
     listing_date = db.Column(db.DateTime, nullable=True)
