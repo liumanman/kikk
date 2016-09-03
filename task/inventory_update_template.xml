@@ -5,13 +5,13 @@
         <MerchantIdentifier>A2BD7G5CIBE1BV</MerchantIdentifier> 
     </Header>
     <MessageType>Inventory</MessageType> 
-    {% for listing in listing_from_amazon %}
+    {% for listing in listing_list %}
     <Message>
         <MessageID>{{ loop.index }}</MessageID> 
         <OperationType>Update</OperationType> 
         <Inventory>
-            <SKU>{{ listing['seller-sku'] }}</SKU> 
-            <Quantity>{{ listing['quantity'] }}</Quantity> 
+            <SKU>{{ listing.sku }}</SKU>
+            <Quantity>{{ listing.q4s }}</Quantity>
             <FulfillmentLatency>2</FulfillmentLatency> 
         </Inventory>
     </Message>

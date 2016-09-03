@@ -3,6 +3,7 @@ from model.database import db
 from model.model_base import Model
 from model.item import Item
 
+
 class Listing(Model):
     listing_id = db.Column(db.Integer, primary_key=True, autoincrement=True)
     listing_source_id = db.Column(db.String(50), nullable=False)
@@ -21,7 +22,11 @@ class Listing(Model):
     memo = db.Column(db.Text)
     status = db.Column(db.String(1), nullable=False)
     in_date = db.Column(db.DateTime, nullable=False)
+    last_sync_date = db.Column(db.DateTime, nullable=False)
+    last_q4s_date = db.Column(db.DateTime)
+    last_price_date = db.Column(db.DateTime)
     sync_status = db.Column(db.String(1), nullable=False)
+    fixed_q4s = db.Column(db.Integer, nullable=False)
 
     STATUS_OPEN = 'O'
     STATUS_CLOSED = 'C'
@@ -48,8 +53,15 @@ class Listing(Model):
             # self.item_desc = item.description
             self.status = Listing.STATUS_OPEN
             self.in_date = datetime.now()
+            self.last_sync_date = datetime.now()
+            self.fixed_q4s = 0
             self.sync_status = Listing.SYNC_STATUS_DONE
             db.session.add(self)
+
+    def sync(self, **kwag):
+        for k, v in kwag.items():
+            setattr(self, k, v)
+            self.last_sync_date = datetime.now()
 
     def update_qty(self, qty, pending_qty):
         if qty is None:

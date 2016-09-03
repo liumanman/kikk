@@ -2,6 +2,7 @@ import sys
 from boto.mws import connection
 from dateutil import parser as tp
 import time
+import datetime
 from jinja2 import Template
 import requests
 from bs4 import BeautifulSoup
@@ -251,7 +252,7 @@ def _insert_single_listing(listing_from_amazon):
                     'pending_qty': int(listing_from_amazon['pending-quantity']),
                     'source_item_id': listing_from_amazon['asin1'],
                     'listing_date': tp.parse(listing_from_amazon['open-date']).astimezone(),
-                    'qty': listing_from_amazon['qty']}
+                    'qty': listing_from_amazon.get('qty', None)}
 
     # listing = Listing(**listing_dict)
     # listing.insert()
@@ -371,7 +372,68 @@ def _adjust_q4s(listing_from_amazon):
     _upload_q4s(changed)
 
 
-def _upload_q4s(listing_from_amazon):
+def adjust_q4s():
+    listing_list = Listing.query.filter_by(status=Listing.STATUS_OPEN, fixed_q4s=0).all()
+    all_inventory_data = fantasyard.get_inventory_data()
+    _logger.info('item qty in inventory list: {}'.format(len(all_inventory_data)))
+    item_qty_in_pending = _get_item_qty_in_pending()
+    changed = []
+    item_list_qty_col = {}
+    item_pending_qty_col = {}
+    open_order_qty_col = {}
+    for listing in listing_list:
+        if listing.item_id in item_list_qty_col:
+            item_list_qty_col[listing.item_id] += 1
+        else:
+            item_list_qty_col[listing.item_id] = 1
+
+        pending_qty = item_qty_in_pending.get(listing.sku, 0)
+        if listing.item_id in item_pending_qty_col:
+            item_pending_qty_col[listing.item_id] += pending_qty
+        else:
+            item_pending_qty_col[listing.item_id] = pending_qty
+
+        if listing.item_id not in open_order_qty_col:
+            open_order_qty = Order.query.filter_by(status=Order.STATUS_OPEN, item_id=listing.item_id).count()
+            open_order_qty_col[listing.item_id] = open_order_qty
+
+    for listing in listing_list:
+        qty = all_inventory_data[listing.item_id]
+        if qty < 10:
+            q4s = 0
+            listing_qty = pending_qty = open_order_qty = None
+        else:
+            listing_qty = item_list_qty_col[listing.item_id]
+            pending_qty = item_pending_qty_col[listing.item_id]
+            open_order_qty = open_order_qty_col[listing.item_id]
+            q4s = int(qty / 2 / listing_qty - pending_qty - open_order_qty)
+            q4s = q4s if q4s > 0 else 0
+            q4s = q4s if q4s < 10 else 9
+        _logger.debug('sku {}, orginal q4s {}, new q4s {}, qty {}'.format(listing.sku, listing.q4s, q4s, qty))
+        if listing.q4s != q4s:
+            listing.q4s = q4s
+            changed.append(listing)
+        listing.qty = qty
+        # _logger.debug('item:{} qty:{} q4s:{} pending: {} open order:{}'.format(listing.sku, listing.qty, listing.q4s, pending_qty, open_order_qty))
+
+    _upload_q4s(changed)
+
+
+def _upload_q4s(listing_list):
+    if not listing_list:
+        return
+    with open('inventory_update_template.xml') as fd:
+        xml_template = fd.read()
+    template = Template(xml_template)
+    feed_content = template.render(listing_list=listing_list)
+    print(feed_content)
+    # _submit_feed('_POST_ORDER_FULFILLMENT_DATA_', feed_content)
+    _logger.info('{} listing(s) uploaded.'.format(len(listing_list)))
+
+
+
+
+def _upload_q4s_old(listing_from_amazon):
     if not listing_from_amazon:
         return
     with open('inventory_update_template.xml') as fd:
@@ -393,6 +455,24 @@ def _save_listing(listing_from_amazon):
                 listing_in_db.price = int(float(listing['price']) * 100)
                 listing_in_db.pending_qty = int(listing['pending-quantity'])
                 listing_in_db.qty = listing['qty']
+            else:
+                _insert_single_listing(listing)
+        except Exception as e:
+            _logger.exception(e)
+
+
+def sync_listing_from_amazon():
+    listing_list = _get_listing_data_from_amazon()
+    for listing in listing_list:
+        try:
+            listing_in_local = get_listing_by_source_id(source, listing['listing-id'])
+            if listing_in_local:
+                kwag = {'q4s': listing['quantity'],
+                        'price': int(float(listing['price']) * 100)}
+                # listing_in_local.q4s = listing['quantity']
+                # listing_in_local.price = int(float(listing['price']) * 100)
+                # listing_in_local.last_sync_date = datetime.datetime.now()
+                listing_in_local.sync(**kwag)
             else:
                 _insert_single_listing(listing)
         except Exception as e:
@@ -451,10 +531,13 @@ def init(flask_app, module_path, db_uri, logger):
     from model.database import init_db
     init_db(flask_app, uri=db_uri)
     # from service.order import get_by_source_id, insert_order, get_open_tracking_number, get_shipped_order, close_order as close_order_by_id
+    import model.listing
+    import model.order
     import service.order as order_svc
     import service.listing as listing_svc
     global _logger, get_by_source_id, insert_order, get_open_tracking_number, get_shipped_order, close_order_by_id
     global insert_listing, get_listing_by_source_id, update_qty_by_source_id
+    global Listing, Order
     _logger = logger
     get_by_source_id = order_svc.get_by_source_id
     insert_order = order_svc.insert_order
@@ -465,6 +548,9 @@ def init(flask_app, module_path, db_uri, logger):
     insert_listing = listing_svc.insert_listing
     get_listing_by_source_id = listing_svc.get_listing_by_source_id
     update_qty_by_source_id = listing_svc.update_qty_by_source_id
+
+    Listing = model.listing.Listing
+    Order = model.order.Order
 
 
 if __name__ == '__main__':
@@ -483,7 +569,12 @@ if __name__ == '__main__':
     # upload_tracking_number()
     # refresh_listing_from_amazon()
 
-    print([(i.price, i.shipping, i.seller) for i in _get_listing_prices('B015TP5L4K')])
+    # print([(i.price, i.shipping, i.seller) for i in _get_listing_prices('B015TP5L4K')])
+    # sync_listing_from_amazon()
+    adjust_q4s()
+
+
+
     # import sys
     # sys.path.append('../')
     # from flask import Flask
