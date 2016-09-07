@@ -24,7 +24,9 @@ class Listing(Model):
     in_date = db.Column(db.DateTime, nullable=False)
     last_sync_date = db.Column(db.DateTime, nullable=False)
     last_q4s_date = db.Column(db.DateTime)
+    last_q4s = db.Column(db.Integer)
     last_price_date = db.Column(db.DateTime)
+    last_price = db.Column(db.Integer)
     sync_status = db.Column(db.String(1), nullable=False)
     fixed_q4s = db.Column(db.Integer, nullable=False)
 
@@ -63,7 +65,7 @@ class Listing(Model):
             setattr(self, k, v)
             self.last_sync_date = datetime.now()
 
-    def update_qty(self, qty, pending_qty):
+    def update_qty_old(self, qty, pending_qty):
         if qty is None:
             qty = self.qty
         if pending_qty is None:
@@ -80,6 +82,15 @@ class Listing(Model):
                 self.q4s = q4s
                 self.sync_status = Listing.SYNC_STATUS_PENDING
             return True
+
+    def update_qty(self, qty):
+        with db.session.begin():
+            self.qty = qty
+
+    def update_q4s(self, q4s):
+        with db.session.begin():
+            self.last_q4s = q4s
+            self.last_q4s_date = datetime.now()
 
     # def update_pending_qty(self, pending_qty):
     #     pass

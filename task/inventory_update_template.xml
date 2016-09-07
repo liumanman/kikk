@@ -12,7 +12,7 @@
         <Inventory>
             <SKU>{{ listing.sku }}</SKU>
             <Quantity>{{ listing.q4s }}</Quantity>
-            <FulfillmentLatency>2</FulfillmentLatency> 
+            <FulfillmentLatency>4</FulfillmentLatency>
         </Inventory>
     </Message>
     {% endfor %}

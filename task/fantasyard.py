@@ -28,10 +28,11 @@ import requests
 s = requests.Session()
 s.mount('https://', MyAdapter())
 
-_url_for_inventory = ['https://www.fantasyard.com/portal/itemreport.php?page=1',
-           'https://www.fantasyard.com/portal/itemreport.php?page=2',
-           'https://www.fantasyard.com/portal/itemreport.php?page=3',
-           'https://www.fantasyard.com/portal/itemreport.php?page=4']    
+_url_for_inventory = ['https://www.fantasyard.com/portal/itemreport.php?page=1&category=290',
+           'https://www.fantasyard.com/portal/itemreport.php?page=2&category=290',
+           'https://www.fantasyard.com/portal/itemreport.php?page=3&category=290',
+           'https://www.fantasyard.com/portal/itemreport.php?page=4&category=290']
+_url_for_single_item_inventory = 'https://www.fantasyard.com/portal/itemreport.php?keyword={}'
 _headers_for_inventory_request = {
     'Connection': 'keep-alive',
     'Cache-Control': 'max-age=0',
@@ -229,17 +230,20 @@ def _download_shipment_page(shipment_id, driver):
     return driver.page_source
 
 
-def get_inventory_data():
-    all_inventory_data = {}
-    for response in map(_request_get_inventory, _url_for_inventory):
-        inventory_data = _read_inventory_from_html(response.text)
-        all_inventory_data.update(inventory_data)
-    return all_inventory_data
+def get_inventory_data(item_id=None):
+    inventory_data = {}
+    url = [_url_for_single_item_inventory.format(item_id)] if item_id else _url_for_inventory
+    for response in map(_request_get_inventory, url):
+        data = _read_inventory_from_html(response.text)
+        inventory_data.update(data)
+    return inventory_data[item_id] if item_id else inventory_data
   
 
 def _read_inventory_from_html(html):
     soup = BeautifulSoup(html, 'html.parser')
     rows = soup.find_all('table')[1].find_all('tr', class_='table-row')
+    if not rows:
+        raise Exception('Fail to get inventory data.')
     result = {}
     for row in rows:
         tds = row.find_all('td', recursive=False)

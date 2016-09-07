@@ -261,27 +261,28 @@ def _insert_single_listing(listing_from_amazon):
 
 def _get_listing_data_from_amazon():
     conn = connection.MWSConnection(Merchant=merchant_id)
-    # request_resp = conn.request_report(ReportType='_GET_MERCHANT_LISTINGS_DATA_')
-    # request_id = request_resp.RequestReportResult.ReportRequestInfo.ReportRequestId
-    # # request_status = request_resp.RequestReportResult.ReportRequestInfo.ReportProcessingStatus
-    # # report_id = None
-    # while True:
-    #     request_result = conn.get_report_request_list(ReportRequestIdList=[request_id])
-    #     info = request_result.GetReportRequestListResult.ReportRequestInfo[0]
-    #     id = info.ReportRequestId
-    #     status = info.ReportProcessingStatus
-    #     if status in ('_SUBMITTED_', '_IN_PROGRESS_'):
-    #         _logger.info('Sleeping and check again....')
-    #         time.sleep(60)
-    #     elif status in ('_DONE_', '_DONE_NO_DATA_'):
-    #         report_id = info.GeneratedReportId
-    #         break
-    #     else:
-    #         # print("Report processing error. Quit.", status)
-    #         raise Exception('Report processing error: {}'.format(status))
+    request_resp = conn.request_report(ReportType='_GET_MERCHANT_LISTINGS_DATA_')
+    request_id = request_resp.RequestReportResult.ReportRequestInfo.ReportRequestId
+    # request_status = request_resp.RequestReportResult.ReportRequestInfo.ReportProcessingStatus
+    # report_id = None
+    while True:
+        request_result = conn.get_report_request_list(ReportRequestIdList=[request_id])
+        info = request_result.GetReportRequestListResult.ReportRequestInfo[0]
+        id = info.ReportRequestId
+        status = info.ReportProcessingStatus
+        if status in ('_SUBMITTED_', '_IN_PROGRESS_'):
+            _logger.info('Sleeping and check again....')
+            time.sleep(60)
+        elif status in ('_DONE_', '_DONE_NO_DATA_'):
+            report_id = info.GeneratedReportId
+            break
+        else:
+            # print("Report processing error. Quit.", status)
+            raise Exception('Report processing error: {}'.format(status))
 
-    # _logger.info('report id: {}'.format(report_id))
-    report = conn.get_report(ReportId=2723618899017044)
+    _logger.info('report id: {}'.format(report_id))
+    report = conn.get_report(ReportId=report_id)
+
     # with open('report', 'b+w') as fd:
     #     fd.write(report)
     lines = report.decode('ISO-8859-1').strip().split('\n')
@@ -398,7 +399,10 @@ def adjust_q4s():
             open_order_qty_col[listing.item_id] = open_order_qty
 
     for listing in listing_list:
-        qty = all_inventory_data[listing.item_id]
+        if listing.item_id in all_inventory_data:
+            qty = all_inventory_data[listing.item_id]
+        else:
+            qty = fantasyard.get_inventory_data(listing.item_id)
         if qty < 10:
             q4s = 0
             listing_qty = pending_qty = open_order_qty = None
@@ -409,11 +413,13 @@ def adjust_q4s():
             q4s = int(qty / 2 / listing_qty - pending_qty - open_order_qty)
             q4s = q4s if q4s > 0 else 0
             q4s = q4s if q4s < 10 else 9
+            listing.update_q4s(q4s)
         _logger.debug('sku {}, orginal q4s {}, new q4s {}, qty {}'.format(listing.sku, listing.q4s, q4s, qty))
         if listing.q4s != q4s:
-            listing.q4s = q4s
+            # listing.q4s = q4s
             changed.append(listing)
-        listing.qty = qty
+        # listing.qty = qty
+        listing.update_qty(qty)
         # _logger.debug('item:{} qty:{} q4s:{} pending: {} open order:{}'.format(listing.sku, listing.qty, listing.q4s, pending_qty, open_order_qty))
 
     _upload_q4s(changed)
@@ -426,8 +432,8 @@ def _upload_q4s(listing_list):
         xml_template = fd.read()
     template = Template(xml_template)
     feed_content = template.render(listing_list=listing_list)
-    print(feed_content)
-    # _submit_feed('_POST_ORDER_FULFILLMENT_DATA_', feed_content)
+    # print(feed_content)
+    _submit_feed('_POST_INVENTORY_AVAILABILITY_DATA_', feed_content)
     _logger.info('{} listing(s) uploaded.'.format(len(listing_list)))
 
 
