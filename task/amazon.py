@@ -191,57 +191,16 @@ def upload_tracking_number():
     #         break
 
 
-_states = dict()
-_states['Alabama'] = 'AL'
-_states['Alaska'] = 'AK'
-_states['Arizona'] = 'AZ'
-_states['Arkansas'] = 'AR'
-_states['California'] = 'CA'
-_states['Colorado'] = 'CO'
-_states['Connecticut'] = 'CT'
-_states['Delaware'] = 'DE'
-_states['Florida'] = 'FL'
-_states['Georgia'] = 'GA'
-_states['Hawaii'] = 'HI'
-_states['Idaho'] = 'ID'
-_states['Illinois'] = 'IL'
-_states['Indiana'] = 'IN'
-_states['Iowa'] = 'IA'
-_states['Kansas'] = 'KS'
-_states['Kentucky'] = 'KY'
-_states['Louisiana'] = 'LA'
-_states['Maine'] = 'ME'
-_states['Maryland'] = 'MD'
-_states['Massachusetts'] = 'MA'
-_states['Michigan'] = 'MI'
-_states['Minnesota'] = 'MN'
-_states['Mississippi'] = 'MS'
-_states['Missouri'] = 'MO'
-_states['Montana'] = 'MT'
-_states['Nebraska'] = 'NE'
-_states['Nevada'] = 'NV'
-_states['New Hampshire'] = 'NH'
-_states['New Jersey'] = 'NJ'
-_states['New Mexico'] = 'NM'
-_states['New York'] = 'NY'
-_states['North Carolina'] = 'NC'
-_states['North Dakota'] = 'ND'
-_states['Ohio'] = 'OH'
-_states['Oklahoma'] = 'OK'
-_states['Oregon'] = 'OR'
-_states['Pennsylvania'] = 'PA'
-_states['Rhode Island'] = 'RI'
-_states['South Carolina'] = 'SC'
-_states['South Dakota'] = 'SD'
-_states['Tennessee'] = 'TN'
-_states['Texas'] = 'TX'
-_states['Utah'] = 'UT'
-_states['Vermont'] = 'VT'
-_states['Virginia'] = 'VA'
-_states['Washington'] = 'WA'
-_states['West Virginia'] = 'WV'
-_states['Wisconsin'] = 'WI'
-_states['Wyoming'] = 'WY'
+_states = {'Alabama': 'AL', 'Alaska': 'AK', 'Arizona': 'AZ', 'Arkansas': 'AR', 'California': 'CA', 'Colorado': 'CO',
+           'Connecticut': 'CT', 'Delaware': 'DE', 'Florida': 'FL', 'Georgia': 'GA', 'Hawaii': 'HI', 'Idaho': 'ID',
+           'Illinois': 'IL', 'Indiana': 'IN', 'Iowa': 'IA', 'Kansas': 'KS', 'Kentucky': 'KY', 'Louisiana': 'LA',
+           'Maine': 'ME', 'Maryland': 'MD', 'Massachusetts': 'MA', 'Michigan': 'MI', 'Minnesota': 'MN',
+           'Mississippi': 'MS', 'Missouri': 'MO', 'Montana': 'MT', 'Nebraska': 'NE', 'Nevada': 'NV',
+           'New Hampshire': 'NH', 'New Jersey': 'NJ', 'New Mexico': 'NM', 'New York': 'NY', 'North Carolina': 'NC',
+           'North Dakota': 'ND', 'Ohio': 'OH', 'Oklahoma': 'OK', 'Oregon': 'OR', 'Pennsylvania': 'PA',
+           'Rhode Island': 'RI', 'South Carolina': 'SC', 'South Dakota': 'SD', 'Tennessee': 'TN', 'Texas': 'TX',
+           'Utah': 'UT', 'Vermont': 'VT', 'Virginia': 'VA', 'Washington': 'WA', 'West Virginia': 'WV',
+           'Wisconsin': 'WI', 'Wyoming': 'WY'}
 
 
 def _insert_single_listing(listing_from_amazon):
@@ -413,13 +372,12 @@ def adjust_q4s():
             q4s = int(qty / 2 / listing_qty - pending_qty - open_order_qty)
             q4s = q4s if q4s > 0 else 0
             q4s = q4s if q4s < 10 else 9
-            listing.update_q4s(q4s)
+        listing.update_qty(qty)
+        listing.update_q4s(q4s)
         _logger.debug('sku {}, orginal q4s {}, new q4s {}, qty {}'.format(listing.sku, listing.q4s, q4s, qty))
         if listing.q4s != q4s:
-            # listing.q4s = q4s
+            listing.append_memo('q4s from {} to {}'.format(listing.q4s, q4s))
             changed.append(listing)
-        # listing.qty = qty
-        listing.update_qty(qty)
         # _logger.debug('item:{} qty:{} q4s:{} pending: {} open order:{}'.format(listing.sku, listing.qty, listing.q4s, pending_qty, open_order_qty))
 
     _upload_q4s(changed)
@@ -437,8 +395,6 @@ def _upload_q4s(listing_list):
     _logger.info('{} listing(s) uploaded.'.format(len(listing_list)))
 
 
-
-
 def _upload_q4s_old(listing_from_amazon):
     if not listing_from_amazon:
         return
@@ -449,7 +405,6 @@ def _upload_q4s_old(listing_from_amazon):
     print(feed_content)
     # _submit_feed('_POST_ORDER_FULFILLMENT_DATA_', feed_content)
     _logger.info('{} listing(s) uploaded.'.format(len(listing_from_amazon)))
-
 
 
 def _save_listing(listing_from_amazon):
@@ -491,25 +446,54 @@ def refresh_listing_from_amazon():
     _save_listing(listing_data)
 
 
-def _get_listing_prices(asin):
-    r = requests.get('https://www.amazon.com/dp/{}'.format(asin), headers=headers_for_get_prices)
-    bs = BeautifulSoup(r.text, 'html.parser')
+def _get_listing_prices(asin=None, listing_url=None):
+    url = listing_url if listing_url else 'https://www.amazon.com/dp/{}'.format(asin)
+    r = requests.get(url, headers=headers_for_get_prices)
+    offer_box_prices = _get_offer_box_prices(r.text)
+    buy_box_price = _get_buy_box_price(r.text)
+    return buy_box_price, offer_box_prices
+
+
+def _get_offer_box_prices(html):
+    bs = BeautifulSoup(html, 'html.parser')
     div_list = bs.find_all('div', class_='a-box mbc-offer-row pa_mbc_on_amazon_offer')
     price_list = []
     for div in div_list:
-        price = div.find('span', class_='a-size-medium a-color-price').string.strip()
+        price = div.find('span', class_='a-size-medium a-color-price').string.strip().replace('$', '')
         seller = div.find('span', class_='a-size-small mbcMerchantName').string.strip()
         shipping_contents = div.find('span', class_='a-size-small a-color-secondary').descendants
         shipping_contents = [c for c in shipping_contents if isinstance(c, str)]
         shipping_fee = _parser_shipping_fee(shipping_contents)
         if shipping_fee is None:
             continue
+        shipping_fee = shipping_fee.replace('$', '')
         o = type('', (object,), {})
         o.price = price
         o.seller = seller
         o.shipping = shipping_fee
+        o.total_price = float(price) + float(shipping_fee)
         price_list.append(o)
     return price_list
+
+
+def _get_buy_box_price(html):
+    bs = BeautifulSoup(html, 'html.parser')
+    price_span = bs.find('span', id='priceblock_ourprice')
+    if not price_span:
+        return None
+    price = price_span.string.strip().replace('$', '')
+    shipping_span = bs.find('span', id='ourprice_shippingmessage').find('span')
+    if not shipping_span:
+        shipping_fee = None
+    else:
+        # shipping_fee = shipping_span.find('span').string.strip().split(' ')[1].replace('$', '')
+        shipping_fee = _parser_shipping_fee([c for c in shipping_span.descendants if isinstance(c, str)])
+    seller = bs.find('div', id='merchant-info').find('a').string
+    o = type('', (object,), {})
+    o.price = price
+    o.seller = seller
+    o.shipping = shipping_fee
+    return o
 
 
 def _parser_shipping_fee(contents):
@@ -522,13 +506,27 @@ def _parser_shipping_fee(contents):
         elif 'FREE SHIPPING' in c2:
             show_free_shipping = True
         else:
-            for c3 in c2.split('\xa0'):
+            d = '\xa0' if '\xa0' in c2 else ' '
+            for c3 in c2.split(d):
                 if '$' in c3:
-                    price = c3
+                    price = c3.replace('$', '')
     if not show_free_shipping and not price:
         raise Exception('Fail to parser shipping fee, contents:{}'.format(contents))
     return '0.00' if show_free_shipping else price
 
+
+def adjust_price():
+    listing_list = Listing.query.filter_by(status=Listing.STATUS_OPEN).all()
+    for listing in listing_list:
+        prices = _get_listing_prices(listing.source_item_id, listing.listing_url)
+        memo = ''
+        for price in prices:
+            memo += '[{:.2f},{},{}]'.format(price.total_price, price.seller, price.shipping)
+        print(listing.sku, listing.source_item_id, memo)
+        if memo:
+            listing.append_memo(memo)
+
+        time.sleep(1)
 
 
 def init(flask_app, module_path, db_uri, logger):
@@ -577,9 +575,12 @@ if __name__ == '__main__':
 
     # print([(i.price, i.shipping, i.seller) for i in _get_listing_prices('B015TP5L4K')])
     # sync_listing_from_amazon()
-    adjust_q4s()
-
-
+    # adjust_q4s()
+    # adjust_price()
+    # t1, t2 = _get_listing_prices('B00AKG31SM')
+    # t1, t2 = _get_listing_prices('B00SSSBY7Y')
+    t1, t2 = _get_listing_prices('B00E1EP4FW')
+    print(t1.price, t1.shipping, t1.seller)
 
     # import sys
     # sys.path.append('../')

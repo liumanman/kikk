@@ -29,6 +29,8 @@ class Listing(Model):
     last_price = db.Column(db.Integer)
     sync_status = db.Column(db.String(1), nullable=False)
     fixed_q4s = db.Column(db.Integer, nullable=False)
+    listing_url = db.Column(db.String(512))
+
 
     STATUS_OPEN = 'O'
     STATUS_CLOSED = 'C'
@@ -91,6 +93,12 @@ class Listing(Model):
         with db.session.begin():
             self.last_q4s = q4s
             self.last_q4s_date = datetime.now()
+
+    def append_memo(self, memo):
+        new_content = '[{}]\n{}\n'.format(datetime.now(), memo)
+        with db.session.begin():
+            self.memo = '' if self.memo is None else self.memo
+            self.memo = new_content + self.memo
 
     # def update_pending_qty(self, pending_qty):
     #     pass
