@@ -11,6 +11,7 @@ import task.fantasyard as fantasyard
 merchant_id = 'A2BD7G5CIBE1BV'
 marketplace_id = 'ATVPDKIKX0DER'
 source = 'Amazon'
+my_seller_name = 'huahuakq'
 order_fulfillment_template = 'order_fulfillment_template.xml'
 adjust_q4s_bypass_list = ['T50109P', 'T50109P-2']
 
@@ -22,6 +23,7 @@ headers_for_get_prices = {
     'Connection': 'keep-alive',
     'Upgrade-Insecure-Requests': '1'
 }
+
 
 def _submit_feed(feed_type, feed_content):
     conn = connection.MWSConnection(Merchant=merchant_id)
@@ -246,8 +248,6 @@ def _get_listing_data_from_amazon():
     #     fd.write(report)
     lines = report.decode('ISO-8859-1').strip().split('\n')
     column_names = lines[0].split('\t')
-    # for column in column_names:
-    #     print(column)
     item_qty_in_pending = _get_item_qty_in_pending()
     listing_data = []
     item_listing_qty = {}
@@ -333,7 +333,7 @@ def _adjust_q4s(listing_from_amazon):
 
 
 def adjust_q4s():
-    listing_list = Listing.query.filter_by(status=Listing.STATUS_OPEN, fixed_q4s=0).all()
+    listing_list = Listing.query.filter_by(status=Listing.STATUS_OPEN, auto_q4s=1).all()
     all_inventory_data = fantasyard.get_inventory_data()
     _logger.info('item qty in inventory list: {}'.format(len(all_inventory_data)))
     item_qty_in_pending = _get_item_qty_in_pending()
@@ -378,7 +378,7 @@ def adjust_q4s():
         if listing.q4s != q4s:
             listing.append_memo('q4s from {} to {}'.format(listing.q4s, q4s))
             changed.append(listing)
-        # _logger.debug('item:{} qty:{} q4s:{} pending: {} open order:{}'.format(listing.sku, listing.qty, listing.q4s, pending_qty, open_order_qty))
+            # _logger.debug('item:{} qty:{} q4s:{} pending: {} open order:{}'.format(listing.sku, listing.qty, listing.q4s, pending_qty, open_order_qty))
 
     _upload_q4s(changed)
 
@@ -449,8 +449,13 @@ def refresh_listing_from_amazon():
 def _get_listing_prices(asin=None, listing_url=None):
     url = listing_url if listing_url else 'https://www.amazon.com/dp/{}'.format(asin)
     r = requests.get(url, headers=headers_for_get_prices)
-    offer_box_prices = _get_offer_box_prices(r.text)
-    buy_box_price = _get_buy_box_price(r.text)
+    try:
+        offer_box_prices = _get_offer_box_prices(r.text)
+        buy_box_price = _get_buy_box_price(r.text)
+    except Exception as e:
+        new_e = Exception(url, e)
+        _logger.exception(new_e)
+        offer_box_prices, buy_box_price = None, None
     return buy_box_price, offer_box_prices
 
 
@@ -468,10 +473,10 @@ def _get_offer_box_prices(html):
             continue
         shipping_fee = shipping_fee.replace('$', '')
         o = type('', (object,), {})
-        o.price = price
+        o.price = int(float(price) * 100)
         o.seller = seller
-        o.shipping = shipping_fee
-        o.total_price = float(price) + float(shipping_fee)
+        o.shipping = int(float(shipping_fee) * 100)
+        o.total_price = o.price + o.shipping
         price_list.append(o)
     return price_list
 
@@ -481,22 +486,32 @@ def _get_buy_box_price(html):
     price_span = bs.find('span', id='priceblock_ourprice')
     if not price_span:
         return None
+    seller_div = bs.find('div', id='merchant-info')
+    if not seller_div:
+        return None
+
     price = price_span.string.strip().replace('$', '')
     shipping_span = bs.find('span', id='ourprice_shippingmessage').find('span')
     if not shipping_span:
-        shipping_fee = None
+        # shipping_fee = None
+        return None
     else:
         # shipping_fee = shipping_span.find('span').string.strip().split(' ')[1].replace('$', '')
         shipping_fee = _parser_shipping_fee([c for c in shipping_span.descendants if isinstance(c, str)])
-    seller = bs.find('div', id='merchant-info').find('a').string
+        if shipping_fee is None:
+            return None
+    seller = seller_div.find('a').string
     o = type('', (object,), {})
-    o.price = price
+    o.price = int(float(price) * 100)
     o.seller = seller
-    o.shipping = shipping_fee
+    o.shipping = int(float(shipping_fee) * 100)
+    o.total_price = o.price + o.shipping
     return o
 
 
 def _parser_shipping_fee(contents):
+    if not contents:
+        return None
     show_free_shipping = False
     price = None
     for c in contents:
@@ -515,18 +530,48 @@ def _parser_shipping_fee(contents):
     return '0.00' if show_free_shipping else price
 
 
-def adjust_price():
+def sync_competitive_prices():
     listing_list = Listing.query.filter_by(status=Listing.STATUS_OPEN).all()
     for listing in listing_list:
-        prices = _get_listing_prices(listing.source_item_id, listing.listing_url)
-        memo = ''
-        for price in prices:
-            memo += '[{:.2f},{},{}]'.format(price.total_price, price.seller, price.shipping)
-        print(listing.sku, listing.source_item_id, memo)
-        if memo:
-            listing.append_memo(memo)
+        buy_box_price, offer_box_prices = _get_listing_prices(listing.source_item_id, listing.listing_url)
+        if offer_box_prices is None:
+            offer_box_prices = ()
+        listing.update_competitive_prices(buy_box_price, *offer_box_prices)
 
-        time.sleep(1)
+
+def calculate_price():
+    listing_list = Listing.query.filter_by(status=Listing.STATUS_OPEN, auto_price=1).all()
+    for listing in listing_list:
+        if listing.min_price is None:
+            continue
+        price_list = []
+        if listing.buy_box_price is not None and listing.buy_box_seller != my_seller_name:
+            price_list.append(listing.buy_box_price)
+        if listing.offer_box_price_1 is not None and listing.offer_box_seller_1 != my_seller_name:
+            price_list.append(listing.offer_box_price_1)
+        if listing.offer_box_price_2 is not None and listing.offer_box_seller_2 != my_seller_name:
+            price_list.append(listing.offer_box_price_2)
+        if not price_list:
+            continue
+        price = min(price_list) - 1
+        price = listing.min_price if price < listing.min_price else price
+        listing.update_last_price(price)
+
+def upload_price():
+    listing_list = Listing.query.filter_by(status=Listing.STATUS_OPEN, auto_price=1).all()
+    changed = []
+    for listing in listing_list:
+        if listing.last_price is None or listing.price == listing.last_price:
+            continue
+        changed.append(listing)
+    if changed:
+        with open('price_update_template.xml') as fd:
+            xml_template = fd.read()
+        template = Template(xml_template)
+        feed_content = template.render(listing_list=changed)
+        print(feed_content)
+        _submit_feed('_POST_PRODUCT_PRICING_DATA_', feed_content)
+    _logger.info('{} listing(s) uploaded.'.format(len(changed)))
 
 
 def init(flask_app, module_path, db_uri, logger):
@@ -579,8 +624,11 @@ if __name__ == '__main__':
     # adjust_price()
     # t1, t2 = _get_listing_prices('B00AKG31SM')
     # t1, t2 = _get_listing_prices('B00SSSBY7Y')
-    t1, t2 = _get_listing_prices('B00E1EP4FW')
-    print(t1.price, t1.shipping, t1.seller)
+    # t1, t2 = _get_listing_prices('B00E1EP4FW')
+    # print(t1.price, t1.shipping, t1.seller)
+    sync_competitive_prices()
+    # calculate_price()
+    # upload_price()
 
     # import sys
     # sys.path.append('../')
