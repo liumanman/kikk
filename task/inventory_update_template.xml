@@ -11,8 +11,8 @@
         <OperationType>Update</OperationType> 
         <Inventory>
             <SKU>{{ listing.sku }}</SKU>
-            <Quantity>{{ listing.q4s }}</Quantity>
-            <FulfillmentLatency>2</FulfillmentLatency> 
+            <Quantity>{{ listing.last_q4s }}</Quantity>
+            <FulfillmentLatency>4</FulfillmentLatency>
         </Inventory>
     </Message>
     {% endfor %}

@@ -11,6 +11,7 @@ import task.fantasyard as fantasyard
 merchant_id = 'A2BD7G5CIBE1BV'
 marketplace_id = 'ATVPDKIKX0DER'
 source = 'Amazon'
+my_seller_name = 'huahuakq'
 order_fulfillment_template = 'order_fulfillment_template.xml'
 adjust_q4s_bypass_list = ['T50109P', 'T50109P-2']
 
@@ -22,6 +23,7 @@ headers_for_get_prices = {
     'Connection': 'keep-alive',
     'Upgrade-Insecure-Requests': '1'
 }
+
 
 def _submit_feed(feed_type, feed_content):
     conn = connection.MWSConnection(Merchant=merchant_id)
@@ -191,57 +193,16 @@ def upload_tracking_number():
     #         break
 
 
-_states = dict()
-_states['Alabama'] = 'AL'
-_states['Alaska'] = 'AK'
-_states['Arizona'] = 'AZ'
-_states['Arkansas'] = 'AR'
-_states['California'] = 'CA'
-_states['Colorado'] = 'CO'
-_states['Connecticut'] = 'CT'
-_states['Delaware'] = 'DE'
-_states['Florida'] = 'FL'
-_states['Georgia'] = 'GA'
-_states['Hawaii'] = 'HI'
-_states['Idaho'] = 'ID'
-_states['Illinois'] = 'IL'
-_states['Indiana'] = 'IN'
-_states['Iowa'] = 'IA'
-_states['Kansas'] = 'KS'
-_states['Kentucky'] = 'KY'
-_states['Louisiana'] = 'LA'
-_states['Maine'] = 'ME'
-_states['Maryland'] = 'MD'
-_states['Massachusetts'] = 'MA'
-_states['Michigan'] = 'MI'
-_states['Minnesota'] = 'MN'
-_states['Mississippi'] = 'MS'
-_states['Missouri'] = 'MO'
-_states['Montana'] = 'MT'
-_states['Nebraska'] = 'NE'
-_states['Nevada'] = 'NV'
-_states['New Hampshire'] = 'NH'
-_states['New Jersey'] = 'NJ'
-_states['New Mexico'] = 'NM'
-_states['New York'] = 'NY'
-_states['North Carolina'] = 'NC'
-_states['North Dakota'] = 'ND'
-_states['Ohio'] = 'OH'
-_states['Oklahoma'] = 'OK'
-_states['Oregon'] = 'OR'
-_states['Pennsylvania'] = 'PA'
-_states['Rhode Island'] = 'RI'
-_states['South Carolina'] = 'SC'
-_states['South Dakota'] = 'SD'
-_states['Tennessee'] = 'TN'
-_states['Texas'] = 'TX'
-_states['Utah'] = 'UT'
-_states['Vermont'] = 'VT'
-_states['Virginia'] = 'VA'
-_states['Washington'] = 'WA'
-_states['West Virginia'] = 'WV'
-_states['Wisconsin'] = 'WI'
-_states['Wyoming'] = 'WY'
+_states = {'Alabama': 'AL', 'Alaska': 'AK', 'Arizona': 'AZ', 'Arkansas': 'AR', 'California': 'CA', 'Colorado': 'CO',
+           'Connecticut': 'CT', 'Delaware': 'DE', 'Florida': 'FL', 'Georgia': 'GA', 'Hawaii': 'HI', 'Idaho': 'ID',
+           'Illinois': 'IL', 'Indiana': 'IN', 'Iowa': 'IA', 'Kansas': 'KS', 'Kentucky': 'KY', 'Louisiana': 'LA',
+           'Maine': 'ME', 'Maryland': 'MD', 'Massachusetts': 'MA', 'Michigan': 'MI', 'Minnesota': 'MN',
+           'Mississippi': 'MS', 'Missouri': 'MO', 'Montana': 'MT', 'Nebraska': 'NE', 'Nevada': 'NV',
+           'New Hampshire': 'NH', 'New Jersey': 'NJ', 'New Mexico': 'NM', 'New York': 'NY', 'North Carolina': 'NC',
+           'North Dakota': 'ND', 'Ohio': 'OH', 'Oklahoma': 'OK', 'Oregon': 'OR', 'Pennsylvania': 'PA',
+           'Rhode Island': 'RI', 'South Carolina': 'SC', 'South Dakota': 'SD', 'Tennessee': 'TN', 'Texas': 'TX',
+           'Utah': 'UT', 'Vermont': 'VT', 'Virginia': 'VA', 'Washington': 'WA', 'West Virginia': 'WV',
+           'Wisconsin': 'WI', 'Wyoming': 'WY'}
 
 
 def _insert_single_listing(listing_from_amazon):
@@ -261,33 +222,32 @@ def _insert_single_listing(listing_from_amazon):
 
 def _get_listing_data_from_amazon():
     conn = connection.MWSConnection(Merchant=merchant_id)
-    # request_resp = conn.request_report(ReportType='_GET_MERCHANT_LISTINGS_DATA_')
-    # request_id = request_resp.RequestReportResult.ReportRequestInfo.ReportRequestId
-    # # request_status = request_resp.RequestReportResult.ReportRequestInfo.ReportProcessingStatus
-    # # report_id = None
-    # while True:
-    #     request_result = conn.get_report_request_list(ReportRequestIdList=[request_id])
-    #     info = request_result.GetReportRequestListResult.ReportRequestInfo[0]
-    #     id = info.ReportRequestId
-    #     status = info.ReportProcessingStatus
-    #     if status in ('_SUBMITTED_', '_IN_PROGRESS_'):
-    #         _logger.info('Sleeping and check again....')
-    #         time.sleep(60)
-    #     elif status in ('_DONE_', '_DONE_NO_DATA_'):
-    #         report_id = info.GeneratedReportId
-    #         break
-    #     else:
-    #         # print("Report processing error. Quit.", status)
-    #         raise Exception('Report processing error: {}'.format(status))
+    request_resp = conn.request_report(ReportType='_GET_MERCHANT_LISTINGS_DATA_')
+    request_id = request_resp.RequestReportResult.ReportRequestInfo.ReportRequestId
+    # request_status = request_resp.RequestReportResult.ReportRequestInfo.ReportProcessingStatus
+    # report_id = None
+    while True:
+        request_result = conn.get_report_request_list(ReportRequestIdList=[request_id])
+        info = request_result.GetReportRequestListResult.ReportRequestInfo[0]
+        id = info.ReportRequestId
+        status = info.ReportProcessingStatus
+        if status in ('_SUBMITTED_', '_IN_PROGRESS_'):
+            _logger.info('Sleeping and check again....')
+            time.sleep(60)
+        elif status in ('_DONE_', '_DONE_NO_DATA_'):
+            report_id = info.GeneratedReportId
+            break
+        else:
+            # print("Report processing error. Quit.", status)
+            raise Exception('Report processing error: {}'.format(status))
 
-    # _logger.info('report id: {}'.format(report_id))
-    report = conn.get_report(ReportId=2723618899017044)
+    _logger.info('report id: {}'.format(report_id))
+    report = conn.get_report(ReportId=report_id)
+
     # with open('report', 'b+w') as fd:
     #     fd.write(report)
     lines = report.decode('ISO-8859-1').strip().split('\n')
     column_names = lines[0].split('\t')
-    # for column in column_names:
-    #     print(column)
     item_qty_in_pending = _get_item_qty_in_pending()
     listing_data = []
     item_listing_qty = {}
@@ -372,12 +332,11 @@ def _adjust_q4s(listing_from_amazon):
     _upload_q4s(changed)
 
 
-def adjust_q4s():
-    listing_list = Listing.query.filter_by(status=Listing.STATUS_OPEN, fixed_q4s=0).all()
+def calculate_q4s():
+    listing_list = Listing.query.filter_by(status=Listing.STATUS_OPEN).all()
     all_inventory_data = fantasyard.get_inventory_data()
     _logger.info('item qty in inventory list: {}'.format(len(all_inventory_data)))
     item_qty_in_pending = _get_item_qty_in_pending()
-    changed = []
     item_list_qty_col = {}
     item_pending_qty_col = {}
     open_order_qty_col = {}
@@ -398,7 +357,10 @@ def adjust_q4s():
             open_order_qty_col[listing.item_id] = open_order_qty
 
     for listing in listing_list:
-        qty = all_inventory_data[listing.item_id]
+        if listing.item_id in all_inventory_data:
+            qty = all_inventory_data[listing.item_id]
+        else:
+            qty = fantasyard.get_inventory_data(listing.item_id)
         if qty < 10:
             q4s = 0
             listing_qty = pending_qty = open_order_qty = None
@@ -409,28 +371,28 @@ def adjust_q4s():
             q4s = int(qty / 2 / listing_qty - pending_qty - open_order_qty)
             q4s = q4s if q4s > 0 else 0
             q4s = q4s if q4s < 10 else 9
+        listing.update_qty(qty)
+        listing.update_last_q4s(q4s)
         _logger.debug('sku {}, orginal q4s {}, new q4s {}, qty {}'.format(listing.sku, listing.q4s, q4s, qty))
-        if listing.q4s != q4s:
-            listing.q4s = q4s
-            changed.append(listing)
-        listing.qty = qty
+        # if listing.q4s != q4s:
+        #     listing.append_memo('q4s from {} to {}'.format(listing.q4s, q4s))
+        #     changed.append(listing)
         # _logger.debug('item:{} qty:{} q4s:{} pending: {} open order:{}'.format(listing.sku, listing.qty, listing.q4s, pending_qty, open_order_qty))
 
-    _upload_q4s(changed)
+        # _upload_q4s(changed)
 
 
-def _upload_q4s(listing_list):
+def upload_q4s():
+    listing_list = Listing.query.filter_by(status=Listing.STATUS_OPEN, auto_q4s=1)
     if not listing_list:
         return
     with open('inventory_update_template.xml') as fd:
         xml_template = fd.read()
     template = Template(xml_template)
     feed_content = template.render(listing_list=listing_list)
-    print(feed_content)
-    # _submit_feed('_POST_ORDER_FULFILLMENT_DATA_', feed_content)
+    # print(feed_content)
+    _submit_feed('_POST_INVENTORY_AVAILABILITY_DATA_', feed_content)
     _logger.info('{} listing(s) uploaded.'.format(len(listing_list)))
-
-
 
 
 def _upload_q4s_old(listing_from_amazon):
@@ -443,7 +405,6 @@ def _upload_q4s_old(listing_from_amazon):
     print(feed_content)
     # _submit_feed('_POST_ORDER_FULFILLMENT_DATA_', feed_content)
     _logger.info('{} listing(s) uploaded.'.format(len(listing_from_amazon)))
-
 
 
 def _save_listing(listing_from_amazon):
@@ -463,15 +424,17 @@ def _save_listing(listing_from_amazon):
 
 def sync_listing_from_amazon():
     listing_list = _get_listing_data_from_amazon()
+    price_dict = _get_amazon_prices(listing_list)
     for listing in listing_list:
         try:
             listing_in_local = get_listing_by_source_id(source, listing['listing-id'])
             if listing_in_local:
                 kwag = {'q4s': listing['quantity'],
-                        'price': int(float(listing['price']) * 100)}
+                        'price': int(float(price_dict[listing_in_local.sku]) * 100)}
                 # listing_in_local.q4s = listing['quantity']
                 # listing_in_local.price = int(float(listing['price']) * 100)
-                # listing_in_local.last_sync_date = datetime.datetime.now()
+                # listing_in_local.last_sync_date = datetime.datetime.now()]
+                print(kwag)
                 listing_in_local.sync(**kwag)
             else:
                 _insert_single_listing(listing)
@@ -485,45 +448,172 @@ def refresh_listing_from_amazon():
     _save_listing(listing_data)
 
 
-def _get_listing_prices(asin):
-    r = requests.get('https://www.amazon.com/dp/{}'.format(asin), headers=headers_for_get_prices)
-    bs = BeautifulSoup(r.text, 'html.parser')
+def _get_listing_prices(asin=None, listing_url=None):
+    url = listing_url if listing_url else 'https://www.amazon.com/dp/{}'.format(asin)
+    r = requests.get(url, headers=headers_for_get_prices)
+    try:
+        offer_box_prices = _get_offer_box_prices(r.text)
+        buy_box_price = _get_buy_box_price(r.text)
+    except Exception as e:
+        new_e = Exception(url, e)
+        _logger.exception(new_e)
+        offer_box_prices, buy_box_price = None, None
+    return buy_box_price, offer_box_prices
+
+
+def _get_offer_box_prices(html):
+    bs = BeautifulSoup(html, 'html.parser')
     div_list = bs.find_all('div', class_='a-box mbc-offer-row pa_mbc_on_amazon_offer')
     price_list = []
     for div in div_list:
-        price = div.find('span', class_='a-size-medium a-color-price').string.strip()
+        price = div.find('span', class_='a-size-medium a-color-price').string.strip().replace('$', '')
         seller = div.find('span', class_='a-size-small mbcMerchantName').string.strip()
         shipping_contents = div.find('span', class_='a-size-small a-color-secondary').descendants
         shipping_contents = [c for c in shipping_contents if isinstance(c, str)]
         shipping_fee = _parser_shipping_fee(shipping_contents)
         if shipping_fee is None:
             continue
+        shipping_fee = shipping_fee.replace('$', '')
         o = type('', (object,), {})
-        o.price = price
+        o.price = int(float(price) * 100)
         o.seller = seller
-        o.shipping = shipping_fee
+        o.shipping = int(float(shipping_fee) * 100)
+        o.total_price = o.price + o.shipping
         price_list.append(o)
     return price_list
 
 
+def _get_buy_box_price(html):
+    bs = BeautifulSoup(html, 'html.parser')
+    price_span = bs.find('span', id='priceblock_ourprice')
+    if not price_span:
+        price_span = bs.find('span', id='priceblock_saleprice')
+    if not price_span:
+        return None
+    seller_div = bs.find('div', id='merchant-info')
+    if not seller_div:
+        return None
+
+    price = price_span.string.strip().replace('$', '')
+    shipping_span = bs.find('span', id='ourprice_shippingmessage')
+    if not shipping_span:
+        shipping_span = bs.find('span', id='saleprice_shippingmessage')
+    if not shipping_span:
+        return None
+    shipping_span = shipping_span.find('span')
+    if not shipping_span:
+        return None
+    else:
+        # shipping_fee = shipping_span.find('span').string.strip().split(' ')[1].replace('$', '')
+        shipping_fee = _parser_shipping_fee([c for c in shipping_span.descendants if isinstance(c, str)])
+        if shipping_fee is None:
+            return None
+    seller = seller_div.find('a').string
+    o = type('', (object,), {})
+    o.price = int(float(price) * 100)
+    o.seller = seller
+    o.shipping = int(float(shipping_fee) * 100)
+    o.total_price = o.price + o.shipping
+    return o
+
+
 def _parser_shipping_fee(contents):
+    print(contents)
+    if not contents:
+        return None
     show_free_shipping = False
     price = None
     for c in contents:
         c2 = c.upper()
         if 'OVER' in c2:
-            return None
+            return '0'
+        if 'AMAZON PRIME' in c2:
+            return '0'
         elif 'FREE SHIPPING' in c2:
             show_free_shipping = True
         else:
-            for c3 in c2.split('\xa0'):
+            d = '\xa0' if '\xa0' in c2 else ' '
+            for c3 in c2.split(d):
                 if '$' in c3:
-                    price = c3
+                    price = c3.replace('$', '')
     if not show_free_shipping and not price:
         raise Exception('Fail to parser shipping fee, contents:{}'.format(contents))
     return '0.00' if show_free_shipping else price
 
 
+def sync_competitive_prices():
+    listing_list = Listing.query.filter_by(status=Listing.STATUS_OPEN).all()
+    for listing in listing_list:
+        # buy_box_price, offer_box_prices = _get_listing_prices(listing.source_item_id, listing.listing_url)
+        # if offer_box_prices is None:
+        #     offer_box_prices = ()
+        # listing.update_competitive_prices(buy_box_price, *offer_box_prices)
+        _download_single_item_prices(listing)
+
+
+def _download_single_item_prices(listing, listing_id=None):
+    if listing_id:
+        listing = Listing.query.filter_by(listing_id=listing_id).one()
+    buy_box_price, offer_box_prices = _get_listing_prices(listing.source_item_id, listing.listing_url)
+    if offer_box_prices is None:
+        offer_box_prices = ()
+    listing.update_competitive_prices(buy_box_price, *offer_box_prices)
+
+
+def calculate_price():
+    listing_list = Listing.query.filter_by(status=Listing.STATUS_OPEN, auto_price=1).all()
+    for listing in listing_list:
+        if listing.min_price is None:
+            continue
+        price_list = []
+        if listing.buy_box_price is not None and listing.buy_box_seller != my_seller_name:
+            price_list.append(listing.buy_box_price)
+        if listing.offer_box_price_1 is not None and listing.offer_box_seller_1 != my_seller_name:
+            price_list.append(listing.offer_box_price_1)
+        if listing.offer_box_price_2 is not None and listing.offer_box_seller_2 != my_seller_name:
+            price_list.append(listing.offer_box_price_2)
+        if not price_list:
+            continue
+        price = min(price_list) - 1
+        price = listing.min_price if price < listing.min_price else price
+        listing.update_last_price(price)
+
+
+def upload_price():
+    listing_list = Listing.query.filter_by(status=Listing.STATUS_OPEN, auto_price=1).all()
+    changed = []
+    for listing in listing_list:
+        if 'fabuzone' in [listing.buy_box_seller, listing.offer_box_seller_1, listing.offer_box_seller_2,
+                          listing.offer_box_seller_3]:
+            continue
+        if listing.last_price is None or listing.price == listing.last_price:
+            continue
+        changed.append(listing)
+    if changed:
+        with open('price_update_template.xml') as fd:
+            xml_template = fd.read()
+        template = Template(xml_template)
+        feed_content = template.render(listing_list=changed)
+        print(feed_content)
+        _submit_feed('_POST_PRODUCT_PRICING_DATA_', feed_content)
+    _logger.info('{} listing(s) uploaded.'.format(len(changed)))
+
+
+def _get_amazon_prices(listing_list):
+    # listing_list = Listing.query.filter_by(status=Listing.STATUS_OPEN)
+    sku_list = [i['seller-sku'] for i in listing_list]
+
+    conn = connection.MWSConnection(Merchant=merchant_id)
+    price_dict = {}
+    for i in range(0, len(sku_list), 20):
+        r = conn.get_my_price_for_sku(MarketplaceId=marketplace_id, SellerSKUList=sku_list[i:i+20])
+        for result in r.GetMyPriceForSKUResult:
+            offer = result.Product.Offers.Offer
+            if offer:
+                price_dict[offer[0].SellerSKU] = offer[0].BuyingPrice.ListingPrice
+    # for listing in listing_list:
+    #     listing.sync(price=int(float(price_dict[listing.sku]) * 100))
+    return price_dict
 
 def init(flask_app, module_path, db_uri, logger):
     sys.path.append(module_path)
@@ -570,10 +660,17 @@ if __name__ == '__main__':
     # refresh_listing_from_amazon()
 
     # print([(i.price, i.shipping, i.seller) for i in _get_listing_prices('B015TP5L4K')])
-    # sync_listing_from_amazon()
-    adjust_q4s()
+    sync_listing_from_amazon()
+    # adjust_q4s()
+    # adjust_price()
+    # sync_competitive_prices()
+    # calculate_price()
+    # upload_price()
+    # calculate_q4s()
 
-
+    # buy, offer = _get_listing_prices('B00WG0IX7Y')
+    # print(buy.price, buy.shipping, buy.seller)
+    # _download_single_item_prices(None, 35)
 
     # import sys
     # sys.path.append('../')

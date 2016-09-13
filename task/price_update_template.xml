@@ -1,0 +1,17 @@
+<?xml version="1.0" encoding="utf-8" ?>
+<AmazonEnvelope xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xsi:noNamespaceSchemaLocation="amzn-envelope.xsd">
+  <Header>
+    <DocumentVersion>1.01</DocumentVersion>
+    <MerchantIdentifier>A2BD7G5CIBE1BV</MerchantIdentifier>
+  </Header>
+  <MessageType>Price</MessageType>
+  {% for listing in listing_list %}
+  <Message>
+    <MessageID>{{ loop.index }}</MessageID>
+    <Price>
+      <SKU>{{ listing.sku }}</SKU>
+      <StandardPrice currency="USD">{{ listing.last_price/100 }}</StandardPrice>
+    </Price>
+  </Message>
+  {% endfor %}
+</AmazonEnvelope>
