@@ -73,7 +73,6 @@ class Listing(Model):
             db.session.add(self)
 
     def sync(self, **kwag):
-        print(kwag)
         with db.session.begin():
             for k, v in kwag.items():
                 setattr(self, k, v)
@@ -106,19 +105,19 @@ class Listing(Model):
             self.last_q4s = q4s
             self.last_q4s_date = datetime.now()
 
-    def update_competitive_prices(self, buy_box_price, *offer_box_prices):
+    def update_competitive_prices(self, last_competitive_prices_datae, buy_box_price, *offer_box_prices):
         if offer_box_prices is None:
             offer_box_prices = []
         with db.session.begin():
             self.buy_box_seller, self.buy_box_price = (None, None) if buy_box_price is None else (
-                buy_box_price.seller, buy_box_price.price)
+                buy_box_price.seller, buy_box_price.total_price)
             self.offer_box_price_1, self.offer_box_seller_1 = (
                 offer_box_prices[0].total_price, offer_box_prices[0].seller) if offer_box_prices else (None, None)
             self.offer_box_price_2, self.offer_box_seller_2 = (
                 offer_box_prices[1].total_price, offer_box_prices[1].seller) if len(offer_box_prices) > 1 else (None, None)
             self.offer_box_price_3, self.offer_box_seller_3 = (
                 offer_box_prices[2].total_price, offer_box_prices[2].seller) if len(offer_box_prices) > 2 else (None, None)
-            self.last_competitive_prices_date = datetime.now()
+            self.last_competitive_prices_date = last_competitive_prices_datae
 
     def update_last_price(self, price):
         if price == self.price:

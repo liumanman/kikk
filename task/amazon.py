@@ -1,8 +1,15 @@
 import sys
+import os
+try:
+    import xml.etree.cElementTree as ET
+except ImportError:
+    import xml.etree.ElementTree as ET
 from boto.mws import connection
+import boto3
 from dateutil import parser as tp
 import time
-import datetime
+import logging, logging.config
+# import datetime
 from jinja2 import Template
 import requests
 from bs4 import BeautifulSoup
@@ -14,6 +21,11 @@ source = 'Amazon'
 my_seller_name = 'huahuakq'
 order_fulfillment_template = 'order_fulfillment_template.xml'
 adjust_q4s_bypass_list = ['T50109P', 'T50109P-2']
+seller_names = {merchant_id: my_seller_name,
+                'A3G8SDKBFJNETJ': 'fabuzone'}
+
+logging.config.fileConfig(os.path.join(sys.path[0], 'logger.config'))
+_logger = logging.getLogger('task')
 
 headers_for_get_prices = {
     'User-Agent': 'Mozilla/5.0 (X11; Ubuntu; Linux x86_64; rv:48.0) Gecko/20100101 Firefox/48.0',
@@ -44,17 +56,21 @@ def _submit_feed(feed_type, feed_content):
             FeedSubmissionIdList=[feed_info.FeedSubmissionId]
         )
         info = submission_list.GetFeedSubmissionListResult.FeedSubmissionInfo[0]
-        id = info.FeedSubmissionId
+        submission_id = info.FeedSubmissionId
         status = info.FeedProcessingStatus
-        _logger.info('Submission Id: {}. Current status: {}'.format(id, status))
+        _logger.info('Submission Id: {}. Current status: {}'.format(submission_id, status))
 
         if status in ('_SUBMITTED_', '_IN_PROGRESS_', '_UNCONFIRMED_'):
             _logger.info('Sleeping and check again....')
             time.sleep(60)
         elif status == '_DONE_':
-            feed_result = conn.get_feed_submission_result(FeedSubmissionId=id)
-            _logger.debug(feed_result)
-            # _logger.info('{} tracking number(s) uploaded.'.format(len(tn_list)))
+            feed_result = conn.get_feed_submission_result(FeedSubmissionId=submission_id)
+            # _logger.debug(feed_result)
+            result_dict = {'successful': feed_result.MessagesSuccessful,
+                           'processed': feed_result.MessagesProcessed,
+                           'error': feed_result.MessagesWithError,
+                           'warning': feed_result.MessagesWithWarning}
+            _logger.debug(result_dict)
             break
         else:
             _logger.error("Submission processing error. Status: {}".format(status))
@@ -229,7 +245,7 @@ def _get_listing_data_from_amazon():
     while True:
         request_result = conn.get_report_request_list(ReportRequestIdList=[request_id])
         info = request_result.GetReportRequestListResult.ReportRequestInfo[0]
-        id = info.ReportRequestId
+        # id = info.ReportRequestId
         status = info.ReportProcessingStatus
         if status in ('_SUBMITTED_', '_IN_PROGRESS_'):
             _logger.info('Sleeping and check again....')
@@ -277,7 +293,7 @@ def _get_listing_data_from_amazon():
 #             new_e = Exception('Fail to insert listing {}'.format(listing['listing-id']), e)
 #             _logger.exception(e)
 
-def _adjust_qty_old(listing_from_amazon):
+def _adjust_qty_deleted(listing_from_amazon):
     all_inventory_data = fantasyard.get_inventory_data()
     for listing in listing_from_amazon:
         listing_in_db = get_listing_by_source_id(source, listing['listing-id'])
@@ -361,7 +377,7 @@ def calculate_q4s():
             qty = all_inventory_data[listing.item_id]
         else:
             qty = fantasyard.get_inventory_data(listing.item_id)
-        if qty < 10:
+        if qty < 5:
             q4s = 0
             listing_qty = pending_qty = open_order_qty = None
         else:
@@ -383,7 +399,7 @@ def calculate_q4s():
 
 
 def upload_q4s():
-    listing_list = Listing.query.filter_by(status=Listing.STATUS_OPEN, auto_q4s=1)
+    listing_list = Listing.query.filter_by(status=Listing.STATUS_OPEN, auto_q4s=1).all()
     if not listing_list:
         return
     with open('inventory_update_template.xml') as fd:
@@ -393,18 +409,6 @@ def upload_q4s():
     # print(feed_content)
     _submit_feed('_POST_INVENTORY_AVAILABILITY_DATA_', feed_content)
     _logger.info('{} listing(s) uploaded.'.format(len(listing_list)))
-
-
-def _upload_q4s_old(listing_from_amazon):
-    if not listing_from_amazon:
-        return
-    with open('inventory_update_template.xml') as fd:
-        xml_template = fd.read()
-    template = Template(xml_template)
-    feed_content = template.render(listing_from_amazon=listing_from_amazon)
-    print(feed_content)
-    # _submit_feed('_POST_ORDER_FULFILLMENT_DATA_', feed_content)
-    _logger.info('{} listing(s) uploaded.'.format(len(listing_from_amazon)))
 
 
 def _save_listing(listing_from_amazon):
@@ -424,17 +428,14 @@ def _save_listing(listing_from_amazon):
 
 def sync_listing_from_amazon():
     listing_list = _get_listing_data_from_amazon()
-    price_dict = _get_amazon_prices(listing_list)
+    # price_dict = _get_amazon_prices(listing_list)
     for listing in listing_list:
         try:
             listing_in_local = get_listing_by_source_id(source, listing['listing-id'])
             if listing_in_local:
                 kwag = {'q4s': listing['quantity'],
-                        'price': int(float(price_dict[listing_in_local.sku]) * 100)}
-                # listing_in_local.q4s = listing['quantity']
-                # listing_in_local.price = int(float(listing['price']) * 100)
-                # listing_in_local.last_sync_date = datetime.datetime.now()]
-                print(kwag)
+                        # 'price': int(float(price_dict[listing_in_local.sku]) * 100)}
+                        'price': int(float(listing['price']) * 100)}
                 listing_in_local.sync(**kwag)
             else:
                 _insert_single_listing(listing)
@@ -442,15 +443,17 @@ def sync_listing_from_amazon():
             _logger.exception(e)
 
 
-def refresh_listing_from_amazon():
+def refresh_listing_from_amazon_deleted():
     listing_data = _get_listing_data_from_amazon()
     _adjust_q4s(listing_data)
     _save_listing(listing_data)
 
 
-def _get_listing_prices(asin=None, listing_url=None):
+def _get_listing_prices_deleted(asin=None, listing_url=None):
     url = listing_url if listing_url else 'https://www.amazon.com/dp/{}'.format(asin)
     r = requests.get(url, headers=headers_for_get_prices)
+    with open('temp', 'w') as fd:
+        fd.write(r.text)
     try:
         offer_box_prices = _get_offer_box_prices(r.text)
         buy_box_price = _get_buy_box_price(r.text)
@@ -541,7 +544,7 @@ def _parser_shipping_fee(contents):
     return '0.00' if show_free_shipping else price
 
 
-def sync_competitive_prices():
+def sync_competitive_prices_deleted():
     listing_list = Listing.query.filter_by(status=Listing.STATUS_OPEN).all()
     for listing in listing_list:
         # buy_box_price, offer_box_prices = _get_listing_prices(listing.source_item_id, listing.listing_url)
@@ -551,7 +554,7 @@ def sync_competitive_prices():
         _download_single_item_prices(listing)
 
 
-def _download_single_item_prices(listing, listing_id=None):
+def _download_single_item_prices_deleted(listing, listing_id=None):
     if listing_id:
         listing = Listing.query.filter_by(listing_id=listing_id).one()
     buy_box_price, offer_box_prices = _get_listing_prices(listing.source_item_id, listing.listing_url)
@@ -586,7 +589,7 @@ def upload_price():
         if 'fabuzone' in [listing.buy_box_seller, listing.offer_box_seller_1, listing.offer_box_seller_2,
                           listing.offer_box_seller_3]:
             continue
-        if listing.last_price is None or listing.price == listing.last_price:
+        if listing.last_price is None:  # or listing.price == listing.last_price:
             continue
         changed.append(listing)
     if changed:
@@ -606,16 +609,90 @@ def _get_amazon_prices(listing_list):
     conn = connection.MWSConnection(Merchant=merchant_id)
     price_dict = {}
     for i in range(0, len(sku_list), 20):
-        r = conn.get_my_price_for_sku(MarketplaceId=marketplace_id, SellerSKUList=sku_list[i:i+20])
+        r = conn.get_my_price_for_sku(MarketplaceId=marketplace_id, SellerSKUList=sku_list[i:i + 20])
         for result in r.GetMyPriceForSKUResult:
             offer = result.Product.Offers.Offer
+            print(offer)
             if offer:
                 price_dict[offer[0].SellerSKU] = offer[0].BuyingPrice.ListingPrice
     # for listing in listing_list:
     #     listing.sync(price=int(float(price_dict[listing.sku]) * 100))
+    print(len(price_dict))
     return price_dict
 
-def init(flask_app, module_path, db_uri, logger):
+
+def sync_competitive_prices():
+    sqs = boto3.resource('sqs', region_name='us-west-2')
+    queue = sqs.get_queue_by_name(QueueName='AnyOfferChangedQueue',
+                                  QueueOwnerAWSAccountId='822634784734', )
+    count = 0
+    for message in queue.receive_messages(MaxNumberOfMessages=10,
+                                          WaitTimeSeconds=20):
+        count += 1
+        # with open('temp', 'w') as fd:
+        #     fd.write(message.body)
+        try:
+            _receive_offer_changed_msg(message.body)
+        except:
+            with open('temp', 'w') as fd:
+                fd.write(message.body)
+            raise
+        message.delete()
+    print(count)
+
+
+def _parser_offer_changed_msg(msg):
+    root = ET.fromstring(msg)
+    item_condition = list(root.iter(tag='ItemCondition'))[0].text
+    if item_condition != 'new':
+        return
+    result = type('', (object,), {})
+    changed_date_string = list(root.iter(tag='TimeOfOfferChange'))[0].text
+    changed_date = tp.parse(changed_date_string).astimezone().replace(tzinfo=None)
+    result.changed_date = changed_date
+    asin = list(root.iter(tag='ASIN'))[0].text
+    result.asin = asin
+    offers_elem = list(root.iter(tag='Offers'))[0]
+    result.offer_box_offers = []
+    future_inventory_offers = []
+    result.buy_box_offer = None
+    for offer_elem in offers_elem:
+        seller_id = list(offer_elem.iter(tag='SellerId'))[0].text
+        listing_price = int(float(list(offer_elem.iterfind('ListingPrice/Amount'))[0].text) * 100)
+        shipping = int(float(list(offer_elem.iterfind('Shipping/Amount'))[0].text) * 100)
+        is_in_buy_box = True if list(offer_elem.iter(tag='IsBuyBoxWinner'))[0].text == 'true' else False
+        is_in_offer_box = True if list(offer_elem.iter(tag='IsFeaturedMerchant'))[0].text == 'true' else False
+        availability_type = list(offer_elem.iter(tag='ShippingTime'))[0].attrib['availabilityType']
+        offer = type('', (object,),
+                     dict(seller=seller_names.get(seller_id, seller_id), price=listing_price, shipping=shipping))
+        if is_in_buy_box:
+            result.buy_box_offer = offer
+        elif is_in_offer_box:
+            if availability_type.upper() == 'NOW':
+                result.offer_box_offers.append(offer)
+            else:
+                future_inventory_offers.append(offer)
+    result.offer_box_offers.extend(future_inventory_offers)
+    return result
+
+
+def _receive_offer_changed_msg(msg):
+    # with open('temp') as fd:
+    #     msg = fd.read()
+    offer_data = _parser_offer_changed_msg(msg)
+    if offer_data.buy_box_offer is not None:
+        offer_data.buy_box_offer.total_price = offer_data.buy_box_offer.shipping + offer_data.buy_box_offer.price
+    for offer_box_offer in offer_data.offer_box_offers:
+        offer_box_offer.total_price = offer_box_offer.shipping + offer_box_offer.price
+    for listing in Listing.query.filter_by(source_item_id=offer_data.asin):
+        if listing.last_competitive_prices_date is not None and listing.last_competitive_prices_date > offer_data.changed_date:
+            print('out of date message')
+            continue
+        listing.update_competitive_prices(offer_data.changed_date, offer_data.buy_box_offer,
+                                          *offer_data.offer_box_offers)
+
+
+def init(flask_app, module_path, db_uri):
     sys.path.append(module_path)
 
     from model.database import init_db
@@ -628,7 +705,6 @@ def init(flask_app, module_path, db_uri, logger):
     global _logger, get_by_source_id, insert_order, get_open_tracking_number, get_shipped_order, close_order_by_id
     global insert_listing, get_listing_by_source_id, update_qty_by_source_id
     global Listing, Order
-    _logger = logger
     get_by_source_id = order_svc.get_by_source_id
     insert_order = order_svc.insert_order
     get_open_tracking_number = order_svc.get_open_tracking_number
@@ -646,31 +722,36 @@ def init(flask_app, module_path, db_uri, logger):
 if __name__ == '__main__':
     sys.path.append('../')
 
-    import common.log as logging
-
-    logging.config('logger.config', 'task')
+    # import common.log as logging
+    #
+    # logging.config('logger.config', 'task')
 
     from flask import Flask
 
     app = Flask(__name__)
 
-    init(app, '../', 'sqlite:///../kikk.db', logging.logger)
+    init(app, '../', 'sqlite:///../kikk.db')
     # insert_unshipped_order()
     # upload_tracking_number()
     # refresh_listing_from_amazon()
 
     # print([(i.price, i.shipping, i.seller) for i in _get_listing_prices('B015TP5L4K')])
-    sync_listing_from_amazon()
+    # sync_listing_from_amazon()
     # adjust_q4s()
     # adjust_price()
-    # sync_competitive_prices()
+    sync_competitive_prices()
     # calculate_price()
     # upload_price()
     # calculate_q4s()
+    # upload_q4s()
 
-    # buy, offer = _get_listing_prices('B00WG0IX7Y')
+    # buy, offer = _get_listing_prices('B015TP5L4K')
     # print(buy.price, buy.shipping, buy.seller)
+
     # _download_single_item_prices(None, 35)
+
+    # _receive_offer_changed_msg(None)
+    # print(r.buy_box_offer.price, r.buy_box_offer.shipping)
 
     # import sys
     # sys.path.append('../')

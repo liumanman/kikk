@@ -14,7 +14,7 @@ _app = Flask(__name__)
 
 db_uri = 'sqlite:///{}'.format(os.path.join(running_path, 'kikk.db'))
 
-amazon.init(_app, running_path, db_uri, logging.logger)
+amazon.init(_app, running_path, db_uri)
 fantasyard.init(_app, running_path, db_uri, logging.logger)
 
 while True:
