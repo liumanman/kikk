@@ -2,6 +2,7 @@ from selenium import webdriver
 from bs4 import BeautifulSoup
 import time
 import functools
+import logging, logging.config
 
 import os, sys
 import configparser
@@ -16,6 +17,9 @@ config.read('fantasyard.ini')
 _email = config['Default']['email'] 
 _password = config['Default']['password'] 
 _cookie = config['Default']['cookie']
+
+logging.config.fileConfig(os.path.join(sys.path[0], 'logger.config'))
+_logger = logging.getLogger('task')
 
 class MyAdapter(HTTPAdapter):
     def init_poolmanager(self, connections, maxsize, block=False):
@@ -148,6 +152,7 @@ def _check_cart_empty(driver):
 
 
 def create_shipment_by_batch():
+    _logger.info('Begin create shipment')
     order_list = get_open_orders()
     for order in order_list:
         try:
@@ -158,6 +163,8 @@ def create_shipment_by_batch():
             _logger.exception(new_e)
         else:
             _logger.info('Success: {0} {1}'.format(order, shipment_id))
+    _logger.info('Create shipment end')
+
 
 def update_tracking_number(order_id, driver):
     order =  get_by_id(order_id)
@@ -168,7 +175,9 @@ def update_tracking_number(order_id, driver):
         update_tn(order_id, *tracking_data_list)
     return [td.tracking_number for td in tracking_data_list] 
 
+
 def update_tn_by_batch():
+    _logger.info('Begin update tracking number')
     order_list = get_ship_ready_order()
     if not order_list:
         return
@@ -183,15 +192,7 @@ def update_tn_by_batch():
             _logger.exception(new_e)
         else:
             _logger.info('Success: {} {}'.format(order, tn_list))
-
-# def _dowload_tracking_number_old(shipment_id, driver):
-#     html = _download_shipment_page(shipment_id, driver)
-#     bs = BeautifulSoup(html, 'html.parser')
-#     for link in bs.find_all('a'):
-#         href = link.get('href')
-#         if href and href.startswith('http://trkcnfrm1.smi.usps.com'):
-#             return href.split('=')[-1].strip()
-#     return None
+    _logger.info('Update tracking number end')
 
 
 def _dowload_tracking_number(shipment_id, driver):
@@ -250,7 +251,8 @@ def _read_inventory_from_html(html):
         result[tds[3].string.strip()] = int(tds[6].string.strip())
     return result
 
-def init(flask_app, moduel_path, db_uri, logger):
+
+def init(flask_app, moduel_path, db_uri):
     import sys
     sys.path.append(moduel_path)
     from model.database import init_db
@@ -258,8 +260,7 @@ def init(flask_app, moduel_path, db_uri, logger):
     init_db(flask_app, db_uri)
     # from service.order import get_by_source_id, update_shipment, get_open_orders, get_by_id, update_tracking_number as update_tn, get_ship_ready_order
     import service.order as order_svc
-    global _logger, get_by_source_id, update_shipment, get_open_orders, get_by_id, update_tn, get_ship_ready_order
-    _logger = logger
+    global get_by_source_id, update_shipment, get_open_orders, get_by_id, update_tn, get_ship_ready_order
     get_by_source_id = order_svc.get_by_source_id
     update_shipment = order_svc.update_shipment
     get_open_orders = order_svc.get_open_orders

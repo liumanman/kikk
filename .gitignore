@@ -99,3 +99,4 @@ task/screenshot/*
 .vscode/
 kikk.db*
 .idea/
+task/message

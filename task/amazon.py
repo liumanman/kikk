@@ -82,6 +82,7 @@ def _sku_to_item_id(sku):
 
 
 def insert_unshipped_order():
+    _logger.info('Begin to insert unshipped order')
     conn = connection.MWSConnection(Merchant=merchant_id)
 
     kw = {
@@ -118,7 +119,7 @@ def insert_unshipped_order():
                         'Fail to insert order# {0}, item# {1}'.format(order.AmazonOrderId, item.SellerSKU), e)
                     _logger.exception(new_e)
                 time.sleep(1)
-
+    _logger.info('Insert unshipped order end')
 
 def _addr_to_str(address):
     attr_list = dir(address)
@@ -141,72 +142,40 @@ def _short_state(state):
 
 
 def close_order():
+    _logger.info('Begin close order')
     local_order_list = get_shipped_order()
-    if not local_order_list:
-        return
-    source_id_list = list(set([order.source_id for order in local_order_list]))
-    conn = connection.MWSConnection(Merchant=merchant_id)
-    order_list = conn.get_order(AmazonOrderId=source_id_list).GetOrderResult.Orders.Order
-    order_dict = {order.AmazonOrderId: order for order in order_list}
+    if local_order_list:
+        source_id_list = list(set([order.source_id for order in local_order_list]))
+        conn = connection.MWSConnection(Merchant=merchant_id)
+        order_list = conn.get_order(AmazonOrderId=source_id_list).GetOrderResult.Orders.Order
+        order_dict = {order.AmazonOrderId: order for order in order_list}
 
-    n = 0
-    for order in local_order_list:
-        if order_dict[order.source_id].OrderStatus == 'Shipped':
-            try:
-                close_order_by_id(order.order_id)
-            except Exception as e:
-                _logger.error('Fail to close order {}'.format(order.order_id))
-                _logger.exception(e)
-            else:
-                n += 1
-    _logger.info('{} order(s) are closed.'.format(n))
+        n = 0
+        for order in local_order_list:
+            if order_dict[order.source_id].OrderStatus == 'Shipped':
+                try:
+                    close_order_by_id(order.order_id)
+                except Exception as e:
+                    _logger.error('Fail to close order {}'.format(order.order_id))
+                    _logger.exception(e)
+                else:
+                    n += 1
+        _logger.info('{} order(s) are closed.'.format(n))
+    _logger.info('Close order end')
 
 
 def upload_tracking_number():
+    _logger.info('Begin upload tracking number')
     tn_list = list(get_open_tracking_number())
-    if not tn_list:
-        return
-    with open(order_fulfillment_template) as fd:
-        xml_template = fd.read()
-    template = Template(xml_template)
-    feed_content = template.render(tracking_number_list=tn_list)
+    if tn_list:
+        with open(order_fulfillment_template) as fd:
+            xml_template = fd.read()
+        template = Template(xml_template)
+        feed_content = template.render(tracking_number_list=tn_list)
 
-    _submit_feed('_POST_ORDER_FULFILLMENT_DATA_', feed_content)
-    _logger.info('{} tracking number(s) uploaded.'.format(len(tn_list)))
-
-    # conn = connection.MWSConnection(Merchant=merchant_id)
-    # feed = conn.submit_feed(
-    #     FeedType='_POST_ORDER_FULFILLMENT_DATA_',
-    #     PurgeAndReplace=False,
-    #     MarketplaceIdList=[marketplace_id],
-    #     content_type='text/xml',
-    #     FeedContent=feed_content.encode('utf-8')
-    # )
-
-    # feed_info = feed.SubmitFeedResult.FeedSubmissionInfo
-    # _logger.info('Submitted product feed: ' + str(feed_info))
-    # # print(feed_info.FeedSubmissionId)
-
-    # while True:
-    #     submission_list = conn.get_feed_submission_list(
-    #         FeedSubmissionIdList=[feed_info.FeedSubmissionId]
-    #     )
-    #     info =  submission_list.GetFeedSubmissionListResult.FeedSubmissionInfo[0]
-    #     id = info.FeedSubmissionId
-    #     status = info.FeedProcessingStatus
-    #     _logger.info('Submission Id: {}. Current status: {}'.format(id, status))
-
-    #     if status in ('_SUBMITTED_', '_IN_PROGRESS_', '_UNCONFIRMED_'):
-    #         _logger.info('Sleeping and check again....')
-    #         time.sleep(60)
-    #     elif status == '_DONE_':
-    #         feedResult = conn.get_feed_submission_result(FeedSubmissionId=id)
-    #         _logger.debug(feedResult)
-    #         _logger.info('{} tracking number(s) uploaded.'.format(len(tn_list)))
-    #         break
-    #     else:
-    #         _logger.error("Submission processing error. Status: {}".format(status))
-    #         break
+        _submit_feed('_POST_ORDER_FULFILLMENT_DATA_', feed_content)
+        _logger.info('{} tracking number(s) uploaded.'.format(len(tn_list)))
+    _logger.info('Upload tracking number end')
 
 
 _states = {'Alabama': 'AL', 'Alaska': 'AK', 'Arizona': 'AZ', 'Arkansas': 'AR', 'California': 'CA', 'Colorado': 'CO',
@@ -568,17 +537,30 @@ def calculate_price():
     for listing in listing_list:
         if listing.min_price is None:
             continue
-        price_list = []
-        if listing.buy_box_price is not None and listing.buy_box_seller != my_seller_name:
-            price_list.append(listing.buy_box_price)
-        if listing.offer_box_price_1 is not None and listing.offer_box_seller_1 != my_seller_name:
-            price_list.append(listing.offer_box_price_1)
-        if listing.offer_box_price_2 is not None and listing.offer_box_seller_2 != my_seller_name:
-            price_list.append(listing.offer_box_price_2)
-        if not price_list:
+        if listing.offer_box_price_1 is None:
             continue
-        price = min(price_list) - 1
+        compared_price = None
+        if listing.offer_box_seller_1 == my_seller_name:
+            if listing.offer_box_price_2 is not None:
+                compared_price = listing.offer_box_price_2
+        else:
+            compared_price = listing.offer_box_price_1
+        if compared_price is None:
+            continue
+        price = compared_price - 1
+        # price_list = []
+        # if listing.buy_box_price is not None and listing.buy_box_seller != my_seller_name:
+        #     price_list.append(listing.buy_box_price)
+        # if listing.offer_box_price_1 is not None and listing.offer_box_seller_1 != my_seller_name:
+        #     price_list.append(listing.offer_box_price_1)
+        # if listing.offer_box_price_2 is not None and listing.offer_box_seller_2 != my_seller_name:
+        #     price_list.append(listing.offer_box_price_2)
+        # if not price_list:
+        #     continue
+        # price = min(price_list) - 1
         price = listing.min_price if price < listing.min_price else price
+        if listing.buy_box_seller == my_seller_name and price < listing.buy_box_price:
+            price = listing.buy_box_price
         listing.update_last_price(price)
 
 
@@ -622,6 +604,7 @@ def _get_amazon_prices(listing_list):
 
 
 def sync_competitive_prices():
+    _logger.info('Begin sync competitive prices')
     sqs = boto3.resource('sqs', region_name='us-west-2')
     queue = sqs.get_queue_by_name(QueueName='AnyOfferChangedQueue',
                                   QueueOwnerAWSAccountId='822634784734', )
@@ -634,14 +617,16 @@ def sync_competitive_prices():
         try:
             _receive_offer_changed_msg(message.body)
         except:
-            with open('temp', 'w') as fd:
+            with open('offer_changed_message', 'a') as fd:
                 fd.write(message.body)
             raise
         message.delete()
-    print(count)
+    _logger.debug('{} messages are received.'.format(count))
+    _logger.info('sync competitive prices end')
 
 
 def _parser_offer_changed_msg(msg):
+    _message_to_file(msg)
     root = ET.fromstring(msg)
     item_condition = list(root.iter(tag='ItemCondition'))[0].text
     if item_condition != 'new':
@@ -652,10 +637,17 @@ def _parser_offer_changed_msg(msg):
     result.changed_date = changed_date
     asin = list(root.iter(tag='ASIN'))[0].text
     result.asin = asin
-    offers_elem = list(root.iter(tag='Offers'))[0]
     result.offer_box_offers = []
     future_inventory_offers = []
     result.buy_box_offer = None
+    # for buy_box_price_elem in root.iter(tag='BuyBoxPrice'):
+    #     if buy_box_price_elem.attrib['condition'] == 'new':
+    #         listing_price = int(float(list(buy_box_price_elem.iterfind('ListingPrice/Amount'))[0].text) * 100)
+    #         shipping = int(float(list(buy_box_price_elem.iterfind('Shipping/Amount'))[0].text) * 100)
+    #         result.buy_box_offer = type('', (object,), dict(seller=None, price=listing_price, shipping=shipping))
+    #         print(result.buy_box_offer.price, result.buy_box_offer.shipping)
+    #         break
+    offers_elem = list(root.iter(tag='Offers'))[0]
     for offer_elem in offers_elem:
         seller_id = list(offer_elem.iter(tag='SellerId'))[0].text
         listing_price = int(float(list(offer_elem.iterfind('ListingPrice/Amount'))[0].text) * 100)
@@ -667,13 +659,33 @@ def _parser_offer_changed_msg(msg):
                      dict(seller=seller_names.get(seller_id, seller_id), price=listing_price, shipping=shipping))
         if is_in_buy_box:
             result.buy_box_offer = offer
-        elif is_in_offer_box:
+        if is_in_offer_box:
             if availability_type.upper() == 'NOW':
                 result.offer_box_offers.append(offer)
             else:
                 future_inventory_offers.append(offer)
     result.offer_box_offers.extend(future_inventory_offers)
+    if result.buy_box_offer is None:
+        for buy_box_price_elem in root.iter(tag='BuyBoxPrice'):
+            if buy_box_price_elem.attrib['condition'] == 'new':
+                listing_price = int(float(list(buy_box_price_elem.iterfind('ListingPrice/Amount'))[0].text) * 100)
+                shipping = int(float(list(buy_box_price_elem.iterfind('Shipping/Amount'))[0].text) * 100)
+                result.buy_box_offer = type('', (object,), dict(seller=None, price=listing_price, shipping=shipping))
+                break
     return result
+
+
+def _message_to_file(msg):
+    root = ET.fromstring(msg)
+    changed_date_string = list(root.iter(tag='TimeOfOfferChange'))[0].text
+    # changed_date = tp.parse(changed_date_string).astimezone().replace(tzinfo=None)
+    asin = list(root.iter(tag='ASIN'))[0].text
+    running_path = sys.path[0]
+    dir_path = os.path.join(running_path, 'message/{0}'.format(asin))
+    if not os.path.exists(dir_path):
+        os.makedirs(dir_path)
+    with open(os.path.join(dir_path, changed_date_string), 'w') as fd:
+        fd.write(msg)
 
 
 def _receive_offer_changed_msg(msg):
@@ -684,12 +696,14 @@ def _receive_offer_changed_msg(msg):
         offer_data.buy_box_offer.total_price = offer_data.buy_box_offer.shipping + offer_data.buy_box_offer.price
     for offer_box_offer in offer_data.offer_box_offers:
         offer_box_offer.total_price = offer_box_offer.shipping + offer_box_offer.price
+    _logger.debug((offer_data.asin, offer_data.changed_date.strftime('%Y-%m-%d %H:%M:%S')))
     for listing in Listing.query.filter_by(source_item_id=offer_data.asin):
         if listing.last_competitive_prices_date is not None and listing.last_competitive_prices_date > offer_data.changed_date:
-            print('out of date message')
+            _logger.debug('out of date message')
             continue
         listing.update_competitive_prices(offer_data.changed_date, offer_data.buy_box_offer,
                                           *offer_data.offer_box_offers)
+        _logger.debug('offers updated')
 
 
 def init(flask_app, module_path, db_uri):
@@ -702,7 +716,7 @@ def init(flask_app, module_path, db_uri):
     import model.order
     import service.order as order_svc
     import service.listing as listing_svc
-    global _logger, get_by_source_id, insert_order, get_open_tracking_number, get_shipped_order, close_order_by_id
+    global get_by_source_id, insert_order, get_open_tracking_number, get_shipped_order, close_order_by_id
     global insert_listing, get_listing_by_source_id, update_qty_by_source_id
     global Listing, Order
     get_by_source_id = order_svc.get_by_source_id
@@ -752,6 +766,7 @@ if __name__ == '__main__':
 
     # _receive_offer_changed_msg(None)
     # print(r.buy_box_offer.price, r.buy_box_offer.shipping)
+    # input()
 
     # import sys
     # sys.path.append('../')
