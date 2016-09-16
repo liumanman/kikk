@@ -179,19 +179,18 @@ def update_tracking_number(order_id, driver):
 def update_tn_by_batch():
     _logger.info('Begin update tracking number')
     order_list = get_ship_ready_order()
-    if not order_list:
-        return
-    driver = _init_driver()
-    _login(driver)
-    for order in order_list:
-        try:
-            tn_list = update_tracking_number(order.order_id, driver)
-        except Exception as e:
-            # _logger.error('Fail to update tracking number for order {}'.format(order.order_id))
-            new_e = Exception('Fail to update tracking number for order {}'.format(order.order_id), e)
-            _logger.exception(new_e)
-        else:
-            _logger.info('Success: {} {}'.format(order, tn_list))
+    if order_list:
+        driver = _init_driver()
+        _login(driver)
+        for order in order_list:
+            try:
+                tn_list = update_tracking_number(order.order_id, driver)
+            except Exception as e:
+                # _logger.error('Fail to update tracking number for order {}'.format(order.order_id))
+                new_e = Exception('Fail to update tracking number for order {}'.format(order.order_id), e)
+                _logger.exception(new_e)
+            else:
+                _logger.info('Success: {} {}'.format(order, tn_list))
     _logger.info('Update tracking number end')
 
 

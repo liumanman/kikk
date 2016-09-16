@@ -64,6 +64,7 @@ def run_in_loop(fun, interval=1, is_running=None, *args, **kwargs):
         fun(*args, **kwargs)
         last_run_time = datetime.now()
 
+
 def _test():
     print('test')
 
@@ -84,10 +85,10 @@ def _start():
     p_list = [
               # multiprocessing.Process(target=run_in_loop, args=(_test, 2, is_running)),
               multiprocessing.Process(target=run_in_loop, args=(import_order_process, 300, is_running)),
-              multiprocessing.Process(target=run_in_loop, args=(fulfill_order_process, 300, is_running)),
-              multiprocessing.Process(target=run_in_loop, args=(sync_competitive_prices_process, 1, is_running)),
-              multiprocessing.Process(target=run_in_loop, args=(sync_listing_from_amazon_process, 60, is_running)),
-              multiprocessing.Process(target=run_in_loop, args=(adjust_q4s_process, 120, is_running)),
+              multiprocessing.Process(target=run_in_loop, args=(fulfill_order_process, 3600, is_running)),
+              multiprocessing.Process(target=run_in_loop, args=(sync_competitive_prices_process, 5, is_running)),
+              multiprocessing.Process(target=run_in_loop, args=(sync_listing_from_amazon_process, 3600, is_running)),
+              multiprocessing.Process(target=run_in_loop, args=(adjust_q4s_process, 600, is_running)),
               # multiprocessing.Process(target=run_in_loop, args=(adjust_price_process, 60, is_running)),
               ]
     for p in p_list:
@@ -97,13 +98,13 @@ def _start():
         p.join()
 
 
-class KikkDaemon(Daemon):
+class TaskDaemon(Daemon):
     def run(self):
         _start()
 
 
 if __name__ == '__main__':
-    daemon = KikkDaemon(pidfile='/tmp/kikk.pid', stdout='/tmp/kikk.out')
+    daemon = TaskDaemon(pidfile='/tmp/kikk.pid', stderr='/tmp/kikk.err')
     if len(sys.argv) == 2:
         if 'start' == sys.argv[1]:
             daemon.start()
