@@ -9,7 +9,6 @@ import boto3
 from dateutil import parser as tp
 import time
 import logging, logging.config
-# import datetime
 from jinja2 import Template
 import requests
 from bs4 import BeautifulSoup
@@ -25,7 +24,7 @@ seller_names = {merchant_id: my_seller_name,
                 'A3G8SDKBFJNETJ': 'fabuzone'}
 
 logging.config.fileConfig(os.path.join(sys.path[0], 'logger.config'))
-_logger = logging.getLogger('task')
+_logger = logging.getLogger('amazon')
 
 headers_for_get_prices = {
     'User-Agent': 'Mozilla/5.0 (X11; Ubuntu; Linux x86_64; rv:48.0) Gecko/20100101 Firefox/48.0',
@@ -120,6 +119,7 @@ def insert_unshipped_order():
                     _logger.exception(new_e)
                 time.sleep(1)
     _logger.info('Insert unshipped order end')
+
 
 def _addr_to_str(address):
     attr_list = dir(address)

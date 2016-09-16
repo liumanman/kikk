@@ -19,7 +19,7 @@ _password = config['Default']['password']
 _cookie = config['Default']['cookie']
 
 logging.config.fileConfig(os.path.join(sys.path[0], 'logger.config'))
-_logger = logging.getLogger('task')
+_logger = logging.getLogger('fantasyard')
 
 class MyAdapter(HTTPAdapter):
     def init_poolmanager(self, connections, maxsize, block=False):

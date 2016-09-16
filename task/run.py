@@ -2,12 +2,15 @@ import sys
 import os
 from datetime import datetime, timedelta
 import multiprocessing
+import signal
+import daemon
 running_path = sys.path[0]
 sys.path.append(os.path.normpath(os.path.join(running_path, '../')))
 import time
 from flask import Flask
 import task.amazon as amazon
 import task.fantasyard as fantasyard
+from common.daemon import Daemon
 
 
 _app = Flask(__name__)
@@ -61,11 +64,27 @@ def run_in_loop(fun, interval=1, is_running=None, *args, **kwargs):
         fun(*args, **kwargs)
         last_run_time = datetime.now()
 
+def _test():
+    print('test')
 
-if __name__ == '__main__':
+
+def _stop(sig, frame):
+    print('stopping', sig)
+    is_running.value = False
+
+signal.signal(signal.SIGTERM, _stop)
+signal.signal(signal.SIGINT, _stop)
+signal.signal(signal.SIGQUIT, _stop)
+# signal.signal(signal.SIGKILL, _stop)
+
+
+def _start():
+    global is_running
     is_running = multiprocessing.Value('b', True)
-    p_list = [multiprocessing.Process(target=run_in_loop, args=(import_order_process, 60, is_running)),
-              multiprocessing.Process(target=run_in_loop, args=(fulfill_order_process, 60, is_running)),
+    p_list = [
+              # multiprocessing.Process(target=run_in_loop, args=(_test, 2, is_running)),
+              multiprocessing.Process(target=run_in_loop, args=(import_order_process, 300, is_running)),
+              multiprocessing.Process(target=run_in_loop, args=(fulfill_order_process, 300, is_running)),
               multiprocessing.Process(target=run_in_loop, args=(sync_competitive_prices_process, 1, is_running)),
               multiprocessing.Process(target=run_in_loop, args=(sync_listing_from_amazon_process, 60, is_running)),
               multiprocessing.Process(target=run_in_loop, args=(adjust_q4s_process, 120, is_running)),
@@ -73,12 +92,33 @@ if __name__ == '__main__':
               ]
     for p in p_list:
         p.start()
-    input()
-    is_running.value = False
-    print('try to stop')
+
     for p in p_list:
         p.join()
 
+
+class KikkDaemon(Daemon):
+    def run(self):
+        _start()
+
+
+if __name__ == '__main__':
+    daemon = KikkDaemon(pidfile='/tmp/kikk.pid', stdout='/tmp/kikk.out')
+    if len(sys.argv) == 2:
+        if 'start' == sys.argv[1]:
+            daemon.start()
+        elif 'stop' == sys.argv[1]:
+            daemon.stop()
+        elif 'restart' == sys.argv[1]:
+            daemon.restart()
+        else:
+            raise Exception("Unknown command")
+        sys.exit(0)
+    else:
+        print("usage: %s start|stop|restart" % sys.argv[0])
+        sys.exit(2)
+    # with daemon.DaemonContext():
+    #     _start()
 # while True:
     # amazon.insert_unshipped_order()
     # fantasyard.create_shipment_by_batch()
