@@ -47,7 +47,7 @@ def _submit_feed(feed_type, feed_content):
     )
 
     feed_info = feed.SubmitFeedResult.FeedSubmissionInfo
-    _logger.info('Submitted product feed: ' + str(feed_info))
+    _logger.debug('Submitted product feed: ' + str(feed_info))
     # print(feed_info.FeedSubmissionId)
 
     while True:
@@ -69,7 +69,7 @@ def _submit_feed(feed_type, feed_content):
                            'processed': feed_result.MessagesProcessed,
                            'error': feed_result.MessagesWithError,
                            'warning': feed_result.MessagesWithWarning}
-            _logger.debug(result_dict)
+            _logger.info(result_dict)
             break
         else:
             _logger.error("Submission processing error. Status: {}".format(status))

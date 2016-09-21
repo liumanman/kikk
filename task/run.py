@@ -86,7 +86,7 @@ def _start():
               # multiprocessing.Process(target=run_in_loop, args=(_test, 2, is_running)),
               multiprocessing.Process(target=run_in_loop, args=(import_order_process, 300, is_running)),
               multiprocessing.Process(target=run_in_loop, args=(fulfill_order_process, 3600, is_running)),
-              multiprocessing.Process(target=run_in_loop, args=(sync_competitive_prices_process, 5, is_running)),
+              multiprocessing.Process(target=run_in_loop, args=(sync_competitive_prices_process, 300, is_running)),
               multiprocessing.Process(target=run_in_loop, args=(sync_listing_from_amazon_process, 3600, is_running)),
               multiprocessing.Process(target=run_in_loop, args=(adjust_q4s_process, 600, is_running)),
               # multiprocessing.Process(target=run_in_loop, args=(adjust_price_process, 60, is_running)),
