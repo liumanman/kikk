@@ -3,7 +3,6 @@ import os
 from datetime import datetime, timedelta
 import multiprocessing
 import signal
-import daemon
 running_path = sys.path[0]
 sys.path.append(os.path.normpath(os.path.join(running_path, '../')))
 import time
@@ -15,10 +14,13 @@ from common.daemon import Daemon
 
 _app = Flask(__name__)
 
-db_uri = 'sqlite:///{}'.format(os.path.normpath(os.path.join(running_path, '../kikk.db')))
+# db_uri = 'sqlite:///{}'.format(os.path.normpath(os.path.join(running_path, '../kikk.db')))
+db_uri = 'mysql+pymysql://root:521000@172.17.0.2/kikk'
 
-amazon.init(_app, running_path, db_uri)
-fantasyard.init(_app, running_path, db_uri)
+
+def _init():
+    amazon.init(_app, running_path, db_uri)
+    fantasyard.init(_app, running_path, db_uri)
 
 
 def import_order_process():
@@ -50,7 +52,9 @@ def adjust_price_process():
     amazon.upload_price()
 
 
-def run_in_loop(fun, interval=1, is_running=None, *args, **kwargs):
+def run_in_loop(fun, interval=1, is_running=None, init=None, *args, **kwargs):
+    if init is not None:
+        init()
     last_run_time = None
     delta_interval = timedelta(seconds=interval)
     while True:
@@ -84,11 +88,11 @@ def _start():
     is_running = multiprocessing.Value('b', True)
     p_list = [
               # multiprocessing.Process(target=run_in_loop, args=(_test, 2, is_running)),
-              multiprocessing.Process(target=run_in_loop, args=(import_order_process, 300, is_running)),
-              multiprocessing.Process(target=run_in_loop, args=(fulfill_order_process, 3600, is_running)),
-              multiprocessing.Process(target=run_in_loop, args=(sync_competitive_prices_process, 300, is_running)),
-              multiprocessing.Process(target=run_in_loop, args=(sync_listing_from_amazon_process, 3600, is_running)),
-              multiprocessing.Process(target=run_in_loop, args=(adjust_q4s_process, 600, is_running)),
+              multiprocessing.Process(target=run_in_loop, args=(import_order_process, 300, is_running, _init)),
+              multiprocessing.Process(target=run_in_loop, args=(fulfill_order_process, 3600, is_running, _init)),
+              multiprocessing.Process(target=run_in_loop, args=(sync_competitive_prices_process, 60, is_running, _init)),
+              multiprocessing.Process(target=run_in_loop, args=(sync_listing_from_amazon_process, 3600, is_running, _init)),
+              multiprocessing.Process(target=run_in_loop, args=(adjust_q4s_process, 600, is_running, _init)),
               # multiprocessing.Process(target=run_in_loop, args=(adjust_price_process, 60, is_running)),
               ]
     for p in p_list:

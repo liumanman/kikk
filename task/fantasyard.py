@@ -286,13 +286,11 @@ if __name__ == '__main__':
     from flask import Flask
     _app = Flask(__name__)
 
-    init(_app, '../', 'sqlite:///../kikk.db', logging.logger)
-
-    # create_shipment_by_batch()
+    # init(_app, '../', 'sqlite:///../kikk.db', logging.logger)
+    init(_app, '../', 'mysql+pymysql://root:521000@172.17.0.2/kikk')
+    create_shipment_by_batch()
 
     # update_tn_by_batch()
-    inventory = get_inventory_data()
-    print(len(inventory))
 
 
 

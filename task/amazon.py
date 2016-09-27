@@ -10,9 +10,10 @@ from dateutil import parser as tp
 import time
 import logging, logging.config
 from jinja2 import Template
-import requests
+# import requests
 from bs4 import BeautifulSoup
-import task.fantasyard as fantasyard
+sys.path.append(os.path.dirname(__file__))
+import fantasyard
 
 merchant_id = 'A2BD7G5CIBE1BV'
 marketplace_id = 'ATVPDKIKX0DER'
@@ -418,19 +419,19 @@ def refresh_listing_from_amazon_deleted():
     _save_listing(listing_data)
 
 
-def _get_listing_prices_deleted(asin=None, listing_url=None):
-    url = listing_url if listing_url else 'https://www.amazon.com/dp/{}'.format(asin)
-    r = requests.get(url, headers=headers_for_get_prices)
-    with open('temp', 'w') as fd:
-        fd.write(r.text)
-    try:
-        offer_box_prices = _get_offer_box_prices(r.text)
-        buy_box_price = _get_buy_box_price(r.text)
-    except Exception as e:
-        new_e = Exception(url, e)
-        _logger.exception(new_e)
-        offer_box_prices, buy_box_price = None, None
-    return buy_box_price, offer_box_prices
+# def _get_listing_prices_deleted(asin=None, listing_url=None):
+#     url = listing_url if listing_url else 'https://www.amazon.com/dp/{}'.format(asin)
+#     r = requests.get(url, headers=headers_for_get_prices)
+#     with open('temp', 'w') as fd:
+#         fd.write(r.text)
+#     try:
+#         offer_box_prices = _get_offer_box_prices(r.text)
+#         buy_box_price = _get_buy_box_price(r.text)
+#     except Exception as e:
+#         new_e = Exception(url, e)
+#         _logger.exception(new_e)
+#         offer_box_prices, buy_box_price = None, None
+#     return buy_box_price, offer_box_prices
 
 
 def _get_offer_box_prices(html):
@@ -684,8 +685,8 @@ def _message_to_file(msg):
     dir_path = os.path.join(running_path, 'message/{0}'.format(asin))
     if not os.path.exists(dir_path):
         os.makedirs(dir_path)
-    with open(os.path.join(dir_path, changed_date_string), 'w') as fd:
-        fd.write(msg)
+    with open(os.path.join(dir_path, changed_date_string), 'wb') as fd:
+        fd.write(msg.encode())
 
 
 def _receive_offer_changed_msg(msg):
@@ -744,7 +745,8 @@ if __name__ == '__main__':
 
     app = Flask(__name__)
 
-    init(app, '../', 'sqlite:///../kikk.db')
+    # init(app, '../', 'sqlite:///../kikk.db')
+    init(app, '../', 'mysql+pymysql://root:521000@172.17.0.2/kikk')
     # insert_unshipped_order()
     # upload_tracking_number()
     # refresh_listing_from_amazon()
@@ -753,7 +755,7 @@ if __name__ == '__main__':
     # sync_listing_from_amazon()
     # adjust_q4s()
     # adjust_price()
-    sync_competitive_prices()
+    # sync_competitive_prices()
     # calculate_price()
     # upload_price()
     # calculate_q4s()

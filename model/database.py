@@ -1,13 +1,16 @@
 from flask_sqlalchemy import SQLAlchemy
 from functools import partial
-# from flask_sqlalchemy import SignallingSession
+
+db = None
 
 
 def init_db(app, uri='sqlite:///kikk.db'):
+    global db
+    if db is not None:
+        return
     app.config['SQLALCHEMY_DATABASE_URI'] = uri
     app.config['SQLALCHEMY_TRACK_MODIFICATIONS'] = False
     # app.config['SQLALCHEMY_ECHO'] = True
-    global db
     db = SQLAlchemy(app, session_options={'autocommit': True})
     # db.create_session = create_session
 
