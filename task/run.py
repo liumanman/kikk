@@ -10,17 +10,30 @@ from flask import Flask
 import task.amazon as amazon
 import task.fantasyard as fantasyard
 from common.daemon import Daemon
+import configparser
 
 
 _app = Flask(__name__)
 
 # db_uri = 'sqlite:///{}'.format(os.path.normpath(os.path.join(running_path, '../kikk.db')))
-db_uri = 'mysql+pymysql://root:521000@172.17.0.2/kikk'
+# db_uri = 'mysql+pymysql://root:521000@172.17.0.2/kikk'
+def get_db_string():
+    config = configparser.RawConfigParser()
+    config.read(os.path.expanduser('~/.kikk/database.ini'))
+    user = config['Default']['user']
+    password = config['Default']['password']
+    host = config['Default']['host']
+    port = config['Default'].get('port', '3306')
+
+    # db_uri = 'mysql+pymysql://root:521000@172.17.0.2/kikk'
+    db_string = 'mysql+pymysql://{user}:{password}@{host}:{port}/kikk'
+    return db_string.format(user=user, password=password, host=host, port=port)
 
 
 def _init():
-    amazon.init(_app, running_path, db_uri)
-    fantasyard.init(_app, running_path, db_uri)
+    db_string = get_db_string()
+    amazon.init(_app, running_path, db_string)
+    fantasyard.init(_app, running_path, db_string)
 
 
 def import_order_process():

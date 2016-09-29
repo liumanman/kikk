@@ -13,9 +13,9 @@ import ssl
 
 # config = configparser.ConfigParser()
 config = configparser.RawConfigParser()
-config.read('fantasyard.ini')
-_email = config['Default']['email'] 
-_password = config['Default']['password'] 
+config.read(os.path.expanduser('~/.kikk/fantasyard.ini'))
+_email = config['Default']['email']
+_password = config['Default']['password']
 _cookie = config['Default']['cookie']
 
 logging.config.fileConfig(os.path.join(sys.path[0], 'logger.config'))
@@ -279,6 +279,7 @@ if __name__ == '__main__':
 
     # from service.order import get_by_source_id, update_shipment, get_open_orders, get_by_id, update_tracking_number as update_tn, get_ship_ready_order
     sys.path.append('../')
+    from task.run import get_db_string
 
     import common.log as logging
     logging.config('logger.config', 'task')
@@ -287,7 +288,7 @@ if __name__ == '__main__':
     _app = Flask(__name__)
 
     # init(_app, '../', 'sqlite:///../kikk.db', logging.logger)
-    init(_app, '../', 'mysql+pymysql://root:521000@172.17.0.2/kikk')
+    init(_app, '../', get_db_string())
     create_shipment_by_batch()
 
     # update_tn_by_batch()

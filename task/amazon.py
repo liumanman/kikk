@@ -742,11 +742,13 @@ if __name__ == '__main__':
     # logging.config('logger.config', 'task')
 
     from flask import Flask
+    from task.run import get_db_string
 
     app = Flask(__name__)
 
     # init(app, '../', 'sqlite:///../kikk.db')
-    init(app, '../', 'mysql+pymysql://root:521000@172.17.0.2/kikk')
+
+    init(app, '../', get_db_string())
     # insert_unshipped_order()
     # upload_tracking_number()
     # refresh_listing_from_amazon()
