@@ -758,8 +758,8 @@ if __name__ == '__main__':
     # sync_competitive_prices()
     # calculate_price()
     # upload_price()
-    # calculate_q4s()
-    # upload_q4s()
+    calculate_q4s()
+    upload_q4s()
 
     # buy, offer = _get_listing_prices('B015TP5L4K')
     # print(buy.price, buy.shipping, buy.seller)
