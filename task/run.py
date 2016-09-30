@@ -18,7 +18,7 @@ import configparser
 _app = Flask(__name__)
 
 # db_uri = 'sqlite:///{}'.format(os.path.normpath(os.path.join(running_path, '../kikk.db')))
-# db_uri = 'mysql+pymysql://root:521000@172.17.0.2/kikk'
+# db_uri = 'mysql+pymysql://root:password@localhost/kikk'
 def get_db_string():
     config = configparser.RawConfigParser()
     config.read(os.path.expanduser('~/.kikk/database.ini'))
@@ -27,7 +27,6 @@ def get_db_string():
     host = config['Default']['host']
     port = config['Default'].get('port', '3306')
 
-    # db_uri = 'mysql+pymysql://root:521000@172.17.0.2/kikk'
     db_string = 'mysql+pymysql://{user}:{password}@{host}:{port}/kikk'
     return db_string.format(user=user, password=password, host=host, port=port)
 
@@ -123,7 +122,7 @@ class TaskDaemon(Daemon):
 
 
 if __name__ == '__main__':
-    daemon = TaskDaemon(pidfile='/tmp/kikk.pid', stderr='kikk.err')
+    daemon = TaskDaemon(pidfile='/tmp/kikk.pid', stderr='kikk.err', enable=False)
     if len(sys.argv) == 2:
         if 'start' == sys.argv[1]:
             daemon.start()
