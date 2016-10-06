@@ -71,16 +71,28 @@ def run_in_loop(fun, interval=1, is_running=None, init=None, *args, **kwargs):
         init()
     last_run_time = None
     delta_interval = timedelta(seconds=interval)
+    retry_count = 0
     while True:
         if is_running is not None and not is_running.value:
             break
-        time.sleep(0.1)
+        time.sleep(1)
         if last_run_time:
             delta = datetime.now() - last_run_time
             if delta < delta_interval:
                 continue
-        fun(*args, **kwargs)
-        last_run_time = datetime.now()
+        try:
+            fun(*args, **kwargs)
+        except Exception as e:
+            print(e)
+            if retry_count >= 5:
+                print('reties exceeded 5, process exit.')
+                break
+            else:
+                retry_count += 1
+                continue
+        else:
+            retry_count = 0
+            last_run_time = datetime.now()
 
 
 def _test():
