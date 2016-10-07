@@ -134,7 +134,7 @@ class TaskDaemon(Daemon):
 
 
 if __name__ == '__main__':
-    daemon = TaskDaemon(pidfile='/tmp/kikk.pid', stderr='kikk.err', enable=False)
+    daemon = TaskDaemon(pidfile='/tmp/kikk.pid', enable=False)
     if len(sys.argv) == 2:
         if 'start' == sys.argv[1]:
             daemon.start()
