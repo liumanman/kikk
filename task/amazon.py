@@ -19,7 +19,7 @@ merchant_id = 'A2BD7G5CIBE1BV'
 marketplace_id = 'ATVPDKIKX0DER'
 source = 'Amazon'
 my_seller_name = 'huahuakq'
-order_fulfillment_template = 'order_fulfillment_template.xml'
+order_fulfillment_template = 'template/order_fulfillment_template.xml'
 adjust_q4s_bypass_list = ['T50109P', 'T50109P-2']
 seller_names = {merchant_id: my_seller_name,
                 'A3G8SDKBFJNETJ': 'fabuzone'}
@@ -372,7 +372,7 @@ def upload_q4s():
     listing_list = Listing.query.filter_by(status=Listing.STATUS_OPEN, auto_q4s=1).all()
     if not listing_list:
         return
-    with open('inventory_update_template.xml') as fd:
+    with open('template/inventory_update_template.xml') as fd:
         xml_template = fd.read()
     template = Template(xml_template)
     feed_content = template.render(listing_list=listing_list)
@@ -576,7 +576,7 @@ def upload_price():
             continue
         changed.append(listing)
     if changed:
-        with open('price_update_template.xml') as fd:
+        with open('template/price_update_template.xml') as fd:
             xml_template = fd.read()
         template = Template(xml_template)
         feed_content = template.render(listing_list=changed)
