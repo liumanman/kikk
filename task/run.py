@@ -63,7 +63,7 @@ def adjust_q4s_process():
 
 def adjust_price_process():
     amazon.calculate_price()
-    amazon.upload_price()
+    # amazon.upload_price()
 
 
 def run_in_loop(fun, interval=1, is_running=None, init=None, *args, **kwargs):
@@ -119,7 +119,7 @@ def _start():
               multiprocessing.Process(target=run_in_loop, args=(sync_competitive_prices_process, 60, is_running, _init)),
               multiprocessing.Process(target=run_in_loop, args=(sync_listing_from_amazon_process, 3600, is_running, _init)),
               multiprocessing.Process(target=run_in_loop, args=(adjust_q4s_process, 600, is_running, _init)),
-              # multiprocessing.Process(target=run_in_loop, args=(adjust_price_process, 60, is_running)),
+              multiprocessing.Process(target=run_in_loop, args=(adjust_price_process, 300, is_running)),
               ]
     for p in p_list:
         p.start()

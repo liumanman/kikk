@@ -560,8 +560,8 @@ def calculate_price():
         #     continue
         # price = min(price_list) - 1
         price = listing.min_price if price < listing.min_price else price
-        if listing.buy_box_seller == my_seller_name and price < listing.buy_box_price:
-            price = listing.buy_box_price
+        # if listing.buy_box_seller == my_seller_name and price < listing.buy_box_price:
+        #     price = listing.buy_box_price
         listing.update_last_price(price)
 
 
