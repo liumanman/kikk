@@ -120,8 +120,8 @@ class Listing(Model):
             self.last_competitive_prices_date = last_competitive_prices_datae
 
     def update_last_price(self, price):
-        if price == self.price:
-            return
+        # if price == self.price:
+        #     return
         with db.session.begin():
             self.last_price = price
             self.last_price_date = datetime.now()

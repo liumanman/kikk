@@ -91,6 +91,7 @@ def run_in_loop(fun, interval=1, is_running=None, init=None, *args, **kwargs):
                 break
             else:
                 retry_count += 1
+                time.sleep(59)
                 continue
         else:
             retry_count = 0
