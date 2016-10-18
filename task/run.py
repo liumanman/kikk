@@ -64,7 +64,7 @@ def adjust_q4s_process():
 
 def adjust_price_process():
     amazon.calculate_price()
-    # amazon.upload_price()
+    amazon.upload_price()
 
 
 def run_in_loop(fun, interval=1, is_running=None, init=None, *args, **kwargs):
