@@ -580,9 +580,9 @@ def upload_price():
             xml_template = fd.read()
         template = Template(xml_template)
         feed_content = template.render(listing_list=changed)
-        print(feed_content)
+        # print(feed_content)
         _submit_feed('_POST_PRODUCT_PRICING_DATA_', feed_content)
-    _logger.info('{} listing(s) uploaded.'.format(len(changed)))
+    _logger.info('{} listing(s) prices uploaded.'.format(len(changed)))
 
 
 def _get_amazon_prices(listing_list):
