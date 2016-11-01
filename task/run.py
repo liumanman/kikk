@@ -28,7 +28,7 @@ def get_db_string():
     host = config['Default']['host']
     port = config['Default'].get('port', '3306')
 
-    db_string = 'mysql+pymysql://{user}:{password}@{host}:{port}/kikk'
+    db_string = 'firebird+fdb://{user}:{password}@{host}:{port}/kikk'
     return db_string.format(user=user, password=password, host=host, port=port)
 
 

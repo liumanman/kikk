@@ -280,11 +280,11 @@ if __name__ == '__main__':
     # from service.order import get_by_source_id, update_shipment, get_open_orders, get_by_id, update_tracking_number as update_tn, get_ship_ready_order
     sys.path.append('../')
     from task.run import get_db_string
-
-    import common.log as logging
-    logging.config('logger.config', 'task')
-
     from flask import Flask
+
+    # import common.log as logging
+    # logging.config('logger.config', 'task')
+
     _app = Flask(__name__)
 
     # init(_app, '../', 'sqlite:///../kikk.db', logging.logger)

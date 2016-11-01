@@ -1,3 +1,4 @@
+connect inet://localhost/mytest user sysdba password 521000;
 delete from item;
 insert into item
 (
@@ -322,15 +323,6 @@ union all
 	,1900
 	,350
 	,'https://www.fantasyard.com/images/thumbnails/11/100/100/T501_ZE6_front.jpg'
-	,'http://www.fantasyard.com/jansport-superbreak-school-backpack-grey-tar-wild-at-heart.html'
+	,'http://www.fantasyard.com/jansport-superbreak-school-backpack-grey-tar-wild-at-heart.html';
 
 
-select
-source_id
-,item_id
-,tracking_number
-,shipping_full_addr
-from "order" as a
-inner join "tracking_number" as b
-on a.order_id=b.order_id
-where a.status='S'

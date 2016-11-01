@@ -27,6 +27,7 @@ def insert_order_2(source, source_id, order_date, item_id, price,
     return order
 
 def insert_order(**kwag):
+    # print(kwag)
     if 'item_id' not in kwag:
         raise Exception('item_id is required.')
     item_id = kwag['item_id']
@@ -37,7 +38,7 @@ def insert_order(**kwag):
     order = Order()
     order.item_desc = item.description
     order.item_cost = item.cost
-    for name,value in kwag.items():
+    for name, value in kwag.items():
         setattr(order, name, value)
     order.create()
     return order

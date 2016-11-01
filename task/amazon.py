@@ -102,8 +102,8 @@ def insert_unshipped_order():
                     # item_id = item.SellerSKU.split('-')[0]
                     item_id = _sku_to_item_id(item.SellerSKU)
                     insert_order(source=source, source_id=order.AmazonOrderId, order_date=order_date, item_id=item_id,
-                                 price=int(float(item.ItemPrice.Amount) * 100) / int(item.QuantityOrdered),
-                                 qty=item.QuantityOrdered, customer_name=order.ShippingAddress.Name,
+                                 price=int(float(item.ItemPrice.Amount) * 100) // int(item.QuantityOrdered),
+                                 qty=int(item.QuantityOrdered), customer_name=order.ShippingAddress.Name,
                                  shipping_address=order.ShippingAddress.AddressLine1,
                                  shipping_address2='{0} {1}'.format(getattr(order.ShippingAddress, 'AddressLine2', ''),
                                                                     getattr(order.ShippingAddress, 'AddressLine3', '')),
@@ -749,19 +749,26 @@ if __name__ == '__main__':
     # init(app, '../', 'sqlite:///../kikk.db')
 
     init(app, '../', get_db_string())
-    # insert_unshipped_order()
-    # upload_tracking_number()
-    # refresh_listing_from_amazon()
-
     # print([(i.price, i.shipping, i.seller) for i in _get_listing_prices('B015TP5L4K')])
     # sync_listing_from_amazon()
-    # adjust_q4s()
-    # adjust_price()
-    # sync_competitive_prices()
+    # while True:
+    #     sync_competitive_prices()
     # calculate_price()
     # upload_price()
-    calculate_q4s()
-    upload_q4s()
+    # calculate_q4s()
+    # upload_q4s()
+    # insert_unshipped_order()
+    # from datetime import datetime
+    # insert_order(source='Amazon',
+    #              source_id='123-232-3223423424',
+    #              item_id='T5010K6',
+    #              item_desc='item desc',
+    #              order_date=datetime.now(),
+    #              price=399,
+    #              qty=1,
+    #              total_price=399,
+    #              item_cost=299,
+    #              )
 
     # buy, offer = _get_listing_prices('B015TP5L4K')
     # print(buy.price, buy.shipping, buy.seller)
