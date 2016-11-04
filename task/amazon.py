@@ -662,9 +662,11 @@ def _parser_offer_changed_msg(msg):
             result.buy_box_offer = offer
         if is_in_offer_box:
             if availability_type.upper() == 'NOW':
-                result.offer_box_offers.append(offer)
+                if next(filter(lambda i: i.seller == offer.seller, result.offer_box_offers), None) is None:
+                    result.offer_box_offers.append(offer)
             else:
-                future_inventory_offers.append(offer)
+                if next(filter(lambda i: i.seller == offer.seller, future_inventory_offers), None) is None:
+                    future_inventory_offers.append(offer)
     result.offer_box_offers.extend(future_inventory_offers)
     if result.buy_box_offer is None:
         for buy_box_price_elem in root.iter(tag='BuyBoxPrice'):
@@ -752,7 +754,7 @@ if __name__ == '__main__':
     # print([(i.price, i.shipping, i.seller) for i in _get_listing_prices('B015TP5L4K')])
     # sync_listing_from_amazon()
     # while True:
-    #     sync_competitive_prices()
+    sync_competitive_prices()
     # calculate_price()
     # upload_price()
     # calculate_q4s()
@@ -769,6 +771,8 @@ if __name__ == '__main__':
     #              total_price=399,
     #              item_cost=299,
     #              )
+    # upload_tracking_number()
+    # close_order()
 
     # buy, offer = _get_listing_prices('B015TP5L4K')
     # print(buy.price, buy.shipping, buy.seller)
